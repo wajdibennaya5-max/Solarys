@@ -3,8 +3,8 @@
 Outil de dimensionnement de centrales photovoltaïques : calepinage réel des
 modules, dossier d'exécution, dimensionnement électrique et étude économique.
 
-**Le site :** https://wajdibennaya5-max.github.io/solarys/
-**L'application :** https://wajdibennaya5-max.github.io/solarys/app/
+**Le site :** https://wajdibennaya5-max.github.io/Solarys/
+**L'application :** https://wajdibennaya5-max.github.io/Solarys/app/
 
 Tout fonctionne dans le navigateur. Aucun compte, aucun serveur : les projets
 restent sur le poste de l'utilisateur et s'exportent en fichier. Une fois la page
