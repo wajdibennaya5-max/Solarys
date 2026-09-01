@@ -1,0 +1,64 @@
+/* ==================================================================
+   Impression — le rapport client. L'interface disparaît, seul le
+   contenu du rapport est mis en page, en A4 portrait, sur fond blanc.
+   ================================================================== */
+
+@page { size: A4; margin: 14mm 12mm 16mm; }
+
+/* Toute l'interface disparaît d'un bloc : masquer `.layout` évite qu'elle
+   continue d'imposer sa hauteur minimale, ce qui insérait une page blanche
+   avant le rapport. */
+.topbar, .layout, .flash, .menu { display: none !important; }
+
+body {
+  background: #fff !important;
+  color: #16202c !important;
+  font-size: 10.5pt;
+}
+
+.print-only { display: block !important; }
+
+/* Jetons forcés en clair : le rapport s'imprime toujours sur fond blanc,
+   quel que soit le thème choisi à l'écran. */
+#print-area {
+  --surface-1: #fff; --surface-2: #f6f8fa; --surface-3: #eef2f7;
+  --border: #ccd4de; --border-strong: #9aa7b6;
+  --text-1: #16202c; --text-2: #46525f; --text-3: #6c7887;
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a;
+  --sld-bg: #fff; --sld-ink: #16202c; --sld-ink-2: #5b6b7f;
+}
+
+.rep-head {
+  display: flex; align-items: flex-start; gap: 16px;
+  padding-bottom: 10px; margin-bottom: 16px;
+  border-bottom: 2px solid #16202c;
+}
+.rep-head h1 { font-size: 17pt; margin: 0 0 2px; }
+.rep-head p { margin: 0; font-size: 9pt; color: #46525f; }
+.rep-logo { max-height: 46px; max-width: 150px; object-fit: contain; }
+.rep-meta { margin-inline-start: auto; text-align: end; font-size: 9pt; line-height: 1.6; }
+
+#print-area h2 {
+  font-size: 12pt; margin: 16px 0 6px;
+  padding-bottom: 3px; border-bottom: 1px solid #ccd4de;
+  break-after: avoid; page-break-after: avoid;
+}
+
+#print-area table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+#print-area th, #print-area td { padding: 4px 7px; border: 1px solid #ccd4de; }
+#print-area thead th { background: #eef2f7; }
+#print-area tfoot td { background: #eef2f7; font-weight: 700; }
+#print-area .table-wrap { border: 0; overflow: visible; margin-top: 6px; }
+#print-area table, #print-area figure { break-inside: avoid; page-break-inside: avoid; }
+
+#print-area .chart svg { max-height: 78mm; }
+#print-area .sld-wrap { border: 0; padding: 0; overflow: visible; }
+/* Une planche occupe une page entière, en paysage. */
+#print-area .sheet-page { break-before: page; page-break-before: always; }
+#print-area .sld-wrap svg { min-width: 0; width: 100%; }
+#print-area .legend { font-size: 8.5pt; color: #46525f; }
+#print-area .chart-tip { display: none; }
+#print-area .disclaimer { margin-top: 14px; font-size: 8pt; color: #6c7887; }
+
+/* Le navigateur doit conserver les aplats de couleur des graphiques. */
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }

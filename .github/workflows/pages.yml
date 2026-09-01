@@ -1,0 +1,69 @@
+# Publie le site sur GitHub Pages.
+#
+# Le dépôt EST le site :
+#   /       la vitrine commerciale
+#   /app/   l'application Solarys
+#
+# La publication n'a lieu que si les tests du moteur de calcul passent : un
+# outil de dimensionnement faux est pire qu'un outil indisponible.
+
+name: Publier le site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  verifier:
+    name: Tests du moteur
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exécuter les tests
+        working-directory: app
+        run: npm test
+
+  publier:
+    name: Assembler et publier
+    needs: verifier
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assembler le site
+        run: |
+          mkdir -p _site
+          # Tout le dépôt est publiable, sauf l'outillage de développement.
+          rsync -a --exclude '.git' --exclude '.github' \
+                   --exclude 'app/tests' --exclude 'app/package.json' \
+                   --exclude 'app/node_modules' --exclude 'app/README.md' \
+                   ./ _site/
+          touch _site/.nojekyll
+          echo "Contenu publié :"
+          find _site -maxdepth 2 -type d | sort
+
+      # Le dépôt étant public, l'action peut activer Pages elle-même.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploiement
+        uses: actions/deploy-pages@v4

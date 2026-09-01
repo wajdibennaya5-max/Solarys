@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="fr" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solarys — du besoin en kWh au dossier d'exécution</title>
+<meta name="description" content="Logiciel de dimensionnement photovoltaïque qui produit le dossier d'exécution complet : schéma unifilaire, sections de câbles, calibres de protections, nomenclature et étude économique. En français et en arabe.">
+<meta name="theme-color" content="#0b0e14">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Solarys — dimensionnement photovoltaïque">
+<meta property="og:description" content="Du besoin en kWh au dossier d'exécution, en dix minutes. Schéma unifilaire, câbles, protections, nomenclature et étude économique.">
+<meta property="og:image" content="./captures/planche-schema-unifilaire.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<style>
+:root{
+  --bg:#0b0e14; --surface:#11151d; --surface-2:#171c26; --border:#262e3d;
+  --text-1:#e8ecf3; --text-2:#a4aec0; --text-3:#6f7a8d;
+  --accent:#f5a524; --accent-ink:#1a1204; --accent-soft:#f5a52418;
+  --good:#199e70; --bad:#e66767;
+  --font:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans Arabic',sans-serif;
+  --wrap:1120px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:var(--font);background:var(--bg);color:var(--text-1);
+  font-size:16px;line-height:1.62;-webkit-font-smoothing:antialiased}
+h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.022em;line-height:1.18}
+p{margin:0}
+a{color:inherit}
+img{max-width:100%;height:auto;display:block}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 22px}
+.eyebrow{font-size:12px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+
+/* ---------- barre ---------- */
+.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);
+  background:color-mix(in srgb,var(--bg) 84%,transparent);border-bottom:1px solid var(--border)}
+.nav .wrap{display:flex;align-items:center;gap:14px;height:62px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:700;letter-spacing:-.02em}
+.brand img{width:26px;height:26px}
+.nav-links{margin-left:auto;display:flex;gap:24px;align-items:center;font-size:14px}
+.nav-links a{color:var(--text-2);text-decoration:none}
+.nav-links a:hover{color:var(--text-1)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:11px 20px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface-2);color:var(--text-1);text-decoration:none;
+  font-size:15px;font-weight:600;cursor:pointer;transition:.15s}
+.btn:hover{background:#1e2532;border-color:#3a4459}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.sm{padding:8px 15px;font-size:14px}
+
+/* ---------- héros ---------- */
+.hero{padding:64px 0 60px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:-40% 30% auto -10%;height:560px;
+  background:radial-gradient(closest-side,#f5a52415,transparent);pointer-events:none}
+.hero-grid{display:grid;gap:44px;grid-template-columns:1.05fr .95fr;align-items:center;position:relative}
+h1{font-size:clamp(34px,5vw,52px)}
+.hero p.lead{margin-top:20px;font-size:19px;color:var(--text-2);max-width:34em}
+.hero-cta{margin-top:30px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.hero-note{margin-top:14px;font-size:13.5px;color:var(--text-3)}
+.shot{border:1px solid var(--border);border-radius:14px;overflow:hidden;
+  background:#fff;box-shadow:0 24px 60px -30px #000c}
+.shot.dark{background:var(--surface)}
+/* Une planche technique comporte beaucoup de blanc : dans le héros on n'en
+   montre que la partie dense, pour ne pas repousser le titre sous la ligne
+   de flottaison. */
+.hero .shot img{width:100%;height:auto;aspect-ratio:2.3/1;
+  object-fit:cover;object-position:top center}
+
+/* ---------- bandes ---------- */
+section{padding:72px 0;border-top:1px solid var(--border)}
+/* La barre collante ne doit pas recouvrir le titre visé par une ancre. */
+section[id],[id]{scroll-margin-top:80px}
+.section-head{max-width:44em;margin-bottom:36px}
+.section-head h2{font-size:clamp(25px,3.2vw,34px);margin-top:10px}
+.section-head p{margin-top:14px;color:var(--text-2);font-size:17px}
+
+.split{display:grid;gap:40px;grid-template-columns:1fr 1fr;align-items:center}
+.split.reverse>:first-child{order:2}
+
+.cards{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(255px,1fr))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px}
+.card h3{font-size:17px;margin-bottom:8px}
+.card p{color:var(--text-2);font-size:14.5px}
+.card .ico{width:34px;height:34px;border-radius:9px;background:var(--accent-soft);
+  display:grid;place-items:center;margin-bottom:14px;color:var(--accent)}
+.card .ico svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- comparatif ---------- */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:14px}
+table{width:100%;border-collapse:collapse;font-size:14.5px;min-width:660px}
+th,td{padding:13px 16px;text-align:left;border-bottom:1px solid var(--border)}
+thead th{background:var(--surface-2);font-size:12.5px;color:var(--text-2);
+  text-transform:uppercase;letter-spacing:.05em;font-weight:650}
+tbody tr:last-child td{border-bottom:0}
+td.c{text-align:center}
+.yes{color:var(--good);font-weight:700}
+.no{color:var(--bad)}
+.mine{background:var(--accent-soft)}
+tbody th{font-weight:550;color:var(--text-1)}
+
+/* ---------- tarifs ---------- */
+.plans{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(236px,1fr));align-items:start}
+.plan{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:26px;
+  display:flex;flex-direction:column;gap:16px;height:100%}
+.plan.featured{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 20px 50px -34px #f5a52466}
+.plan .tag{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent)}
+.price{font-size:38px;font-weight:700;letter-spacing:-.03em;line-height:1}
+.price small{font-size:15px;font-weight:500;color:var(--text-3);letter-spacing:0}
+.plan ul{list-style:none;margin:0;padding:0;display:grid;gap:9px;font-size:14.5px;color:var(--text-2)}
+.plan li{display:flex;gap:9px;align-items:flex-start}
+.plan li::before{content:'✓';color:var(--good);font-weight:700;flex:none}
+.plan li.off{color:var(--text-3)}
+.plan li.off::before{content:'—';color:var(--text-3)}
+.plan .btn{margin-top:auto;width:100%}
+
+/* ---------- faq ---------- */
+details{border:1px solid var(--border);border-radius:12px;background:var(--surface);
+  padding:16px 20px;margin-bottom:10px}
+details[open]{background:var(--surface-2)}
+summary{cursor:pointer;font-weight:600;font-size:16px;list-style:none;
+  display:flex;justify-content:space-between;gap:14px;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:'+';color:var(--accent);font-size:20px;font-weight:400;flex:none}
+details[open] summary::after{content:'−'}
+details p{margin-top:12px;color:var(--text-2);font-size:15px}
+
+/* ---------- pied ---------- */
+footer{border-top:1px solid var(--border);padding:44px 0 56px;color:var(--text-3);font-size:13.5px}
+footer .wrap{display:grid;gap:22px}
+footer a{color:var(--text-2)}
+.disclaimer{padding:16px 18px;border:1px solid var(--border);border-radius:12px;
+  background:var(--surface);border-left:3px solid var(--accent);color:var(--text-2);font-size:13.5px}
+
+.cta-band{text-align:center}
+.cta-band h2{font-size:clamp(26px,3.4vw,36px)}
+.cta-band p{margin-top:14px;color:var(--text-2);font-size:17px}
+.cta-band .hero-cta{justify-content:center;margin-top:26px}
+
+@media(max-width:880px){
+  .hero-grid,.split{grid-template-columns:1fr}
+  .split.reverse>:first-child{order:0}
+  .nav-links a:not(.btn){display:none}
+  .hero{padding:52px 0 44px}
+  section{padding:56px 0}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav"><div class="wrap">
+  <a class="brand" href="#"><img src="./icon.svg" alt=""> Solarys</a>
+  <div class="nav-links">
+    <a href="#produit">Le produit</a>
+    <a href="#comparatif">Comparatif</a>
+    <a href="#tarifs">Tarifs</a>
+    <a class="btn primary sm" href="./app/">Ouvrir l'application</a>
+  </div>
+</div></nav>
+
+<header class="hero"><div class="wrap hero-grid">
+  <div>
+    <span class="eyebrow">Dimensionnement photovoltaïque</span>
+    <h1>Du besoin en kWh au dossier d'exécution, en dix minutes.</h1>
+    <p class="lead">
+      Solarys calcule le champ, vérifie les chaînes contre l'onduleur, détermine les
+      sections de câbles et les calibres de protections, puis édite les planches —
+      schéma unifilaire, tableaux, nomenclature — avec cadre et cartouche à révisions.
+      En français, en arabe, et hors ligne.
+    </p>
+    <div class="hero-cta">
+      <a class="btn primary" href="./app/">Essayer gratuitement</a>
+      <a class="btn" href="#produit">Voir une planche</a>
+    </div>
+    <p class="hero-note">Aucune installation, aucun compte. Vos projets restent dans votre navigateur.</p>
+  </div>
+  <div class="shot"><img src="./captures/planche-schema-unifilaire.png"
+    alt="Planche de schéma unifilaire générée par Solarys, avec cadre, cartouche à tableau de révisions et tableau de description générale de la centrale" loading="eager" width="2220" height="1584"></div>
+</div></header>
+
+<section id="produit"><div class="wrap">
+  <div class="section-head">
+    <span class="eyebrow">Le problème</span>
+    <h2>Le calcul prend vingt minutes. Le dossier prend la journée.</h2>
+    <p>
+      Dimensionner une centrale n'est pas le plus long. Ce qui coûte, c'est le dossier
+      qu'il faut rendre derrière : redessiner le schéma unifilaire sous AutoCAD, retaper
+      les sections de câbles, recomposer le cartouche, refaire la nomenclature. À chaque
+      projet. Les outils gratuits ne le font pas ; les outils qui approchent coûtent
+      700 à 1 800 € par an et par poste.
+    </p>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 8h4v8H4zM10 12h4M16 8h4v8h-4zM8 12h2"/></svg></div>
+      <h3>Le dossier d'exécution, automatique</h3>
+      <p>Planches A4 à A1 : cadre, cartouche avec tableau de révisions, tableau de
+        description générale de la centrale, folio. Export SVG, impression directe.</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 6h6a4 4 0 0 1 4 4v4a4 4 0 0 0 4 4h2M4 6v12"/></svg></div>
+      <h3>L'ingénierie réellement calculée</h3>
+      <p>Sections retenues au plus contraignant du courant admissible et de la chute de
+        tension. Fusibles gPV bornés par la tenue inverse du module. Tension à vide à
+        froid vérifiée contre la limite de l'onduleur.</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/></svg></div>
+      <h3>Un vrai modèle de gisement</h3>
+      <p>Profil horaire reconstitué sur le jour moyen du mois, décomposition direct/diffus
+        par Erbs, transposition HDKR. Toute orientation, toute inclinaison. 34 villes de
+        référence, données modifiables.</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+      <h3>L'étude économique qui convainc</h3>
+      <p>Nomenclature chiffrée, flux de trésorerie sur 25 ans, valeur actuelle nette,
+        taux de rentabilité interne, temps de retour, coût du kWh produit, CO₂ évité.</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M6 2h9l3 3v17H6zM9 9h6M9 13h6M9 17h4"/></svg></div>
+      <h3>Votre marque, pas la nôtre</h3>
+      <p>Logo, raison sociale et coordonnées dans le cartouche et dans le rapport client.
+        Le document que vous rendez porte votre nom.</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg></div>
+      <h3>Français, arabe, hors ligne</h3>
+      <p>Interface complète en trois langues avec écriture de droite à gauche. Installable
+        sur téléphone. Fonctionne sur un chantier sans réseau.</p>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="split">
+    <div>
+      <span class="eyebrow">Étape 1 — le calcul</span>
+      <h2 style="font-size:clamp(23px,3vw,30px);margin-top:10px">Saisissez le besoin, l'outil propose la centrale.</h2>
+      <p style="margin-top:14px;color:var(--text-2)">
+        Facture annuelle, relevé mensuel ou liste d'équipements. Solarys en déduit la
+        puissance crête, choisit la longueur de chaîne compatible avec l'onduleur, et
+        affiche immédiatement le productible, le ratio de performance, l'autoconsommation
+        et le temps de retour.
+      </p>
+    </div>
+    <div class="shot dark"><img src="./captures/tableau-de-bord.png"
+      alt="Tableau de bord de Solarys : puissance crête, production annuelle, productible spécifique, ratio de performance, investissement, retour sur investissement, et graphique de production mensuelle" loading="lazy"></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="split reverse">
+    <div>
+      <span class="eyebrow">Étape 2 — l'ingénierie</span>
+      <h2 style="font-size:clamp(23px,3vw,30px);margin-top:10px">Chaque section justifiée par son critère dimensionnant.</h2>
+      <p style="margin-top:14px;color:var(--text-2)">
+        Longueurs de liaison, température ambiante des câbles, circuits jointifs,
+        conducteur cuivre ou aluminium, niveau kéraunique. L'outil retient la section
+        imposée par le critère le plus sévère et vous dit lequel — c'est ce qui rend la
+        note de calcul défendable devant un bureau de contrôle.
+      </p>
+    </div>
+    <div class="shot dark"><img src="./captures/cablage.png"
+      alt="Section câblage et protections : tableau des sections de câbles avec courant admissible, chute de tension et critère dimensionnant, puis calibres de fusibles, sectionneurs, disjoncteurs et parafoudres" loading="lazy"></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <span class="eyebrow">Étape 3 — le livrable</span>
+    <h2>Les planches que vous rendez au client.</h2>
+    <p>Générées à partir du dimensionnement, jamais redessinées à la main.</p>
+  </div>
+  <div class="shot"><img src="./captures/planche-cables-protections.png"
+    alt="Planche « câbles et protections » : tableau des câbles, tableau des protections et nomenclature chiffrée, avec cartouche complet" loading="lazy"></div>
+</div></section>
+
+<section id="comparatif"><div class="wrap">
+  <div class="section-head">
+    <span class="eyebrow">Comparatif</span>
+    <h2>Ce que font — et ne font pas — les autres outils.</h2>
+    <p>Tarifs publics constatés en 2026. Le tableau porte sur les fonctions, pas sur la qualité :
+      PVsyst reste la référence du productible bancable, et le restera.</p>
+  </div>
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th>Fonction</th><th class="c mine">Solarys</th><th class="c">OpenSolar</th>
+      <th class="c">PVsyst</th><th class="c">Aurora</th><th class="c">PVWatts</th>
+    </tr></thead>
+    <tbody>
+      <tr><th>Calcul du productible</th><td class="c mine yes">Oui</td><td class="c yes">Oui</td><td class="c yes">Oui</td><td class="c yes">Oui</td><td class="c yes">Oui</td></tr>
+      <tr><th>Vérification des chaînes / onduleur</th><td class="c mine yes">Oui</td><td class="c no">Non</td><td class="c yes">Oui</td><td class="c yes">Oui</td><td class="c no">Non</td></tr>
+      <tr><th>Sections de câbles calculées</th><td class="c mine yes">Oui</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td></tr>
+      <tr><th>Calibres de protections</th><td class="c mine yes">Oui</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td></tr>
+      <tr><th>Schéma unifilaire généré</th><td class="c mine yes">Oui</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td></tr>
+      <tr><th>Planches à cadre et cartouche</th><td class="c mine yes">Oui</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td></tr>
+      <tr><th>Interface arabe</th><td class="c mine yes">Oui</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td></tr>
+      <tr><th>Fonctionne hors ligne</th><td class="c mine yes">Oui</td><td class="c no">Non</td><td class="c yes">Oui</td><td class="c no">Non</td><td class="c no">Non</td></tr>
+      <tr><th>Sur téléphone</th><td class="c mine yes">Oui</td><td class="c yes">Oui</td><td class="c no">Non</td><td class="c yes">Oui</td><td class="c yes">Oui</td></tr>
+      <tr><th>Prix annuel</th><td class="c mine"><b>voir ci-dessous</b></td><td class="c">gratuit</td><td class="c">≈ 700 CHF</td><td class="c">≈ 1 765 $</td><td class="c">gratuit</td></tr>
+    </tbody>
+  </table></div>
+  <p style="margin-top:14px;font-size:13px;color:var(--text-3)">
+    PVsyst et PV*SOL fonctionnent uniquement sous Windows. OpenSolar est gratuit mais ne
+    produit ni schéma unifilaire, ni note de calcul électrique, ni dossier de permis.
+  </p>
+</div></section>
+
+<section id="tarifs"><div class="wrap">
+  <div class="section-head">
+    <span class="eyebrow">Tarifs</span>
+    <h2>Un dossier sous-traité coûte 200 à 800 €. Solarys en produit un par projet.</h2>
+    <p>Tout est calculable gratuitement, sans compte et sans limite de durée : vous pouvez
+      mener un projet entier avant de décider. Le paiement retire le filigrane des planches
+      et y met votre marque. Et si vous ne rendez que deux ou trois études par an,
+      payez au dossier plutôt qu'à l'année.</p>
+  </div>
+
+  <div class="plans">
+    <div class="plan">
+      <span class="tag">Découverte</span>
+      <div class="price">0 €</div>
+      <ul>
+        <li>Tous les calculs, sans restriction</li>
+        <li>Projets illimités</li>
+        <li>Toutes les planches et le rapport</li>
+        <li class="off">Planches filigranées « avant-projet »</li>
+        <li class="off">Cartouche au nom du logiciel</li>
+      </ul>
+      <a class="btn" href="./app/">Commencer maintenant</a>
+    </div>
+
+    <div class="plan featured">
+      <span class="tag">À l'étude</span>
+      <div class="price">9 € <small>par dossier</small></div>
+      <ul>
+        <li>Un dossier client, sans filigrane</li>
+        <li>Votre logo dans le cartouche</li>
+        <li>Export SVG des planches</li>
+        <li>Aucun engagement, aucune date de fin</li>
+        <li>Le dossier payé le reste pour toujours</li>
+      </ul>
+      <a class="btn primary" href="#acheter" data-plan="credits">Acheter un dossier</a>
+      <p style="font-size:12.5px;color:var(--text-3);margin-top:-4px">
+        Pour l'installateur qui rend deux ou trois études par an.
+      </p>
+    </div>
+
+    <div class="plan">
+      <span class="tag">Perpétuelle — offre de lancement</span>
+      <div class="price">20 € <small>une seule fois</small></div>
+      <ul>
+        <li>Projets illimités, sans filigrane</li>
+        <li>Marque blanche complète</li>
+        <li>Version 1.x à vie, correctifs inclus</li>
+        <li>Clé de licence livrée par courriel</li>
+      </ul>
+      <a class="btn" href="#acheter" data-plan="perpetuelle">Acheter la licence</a>
+      <p style="font-size:12.5px;color:var(--text-3);margin-top:-4px">
+        Réservé aux 100 premières licences. Passera ensuite à 99 €.
+      </p>
+    </div>
+
+    <div class="plan">
+      <span class="tag">Pro — abonnement</span>
+      <div class="price">149 € <small>par an</small></div>
+      <ul>
+        <li>Tout ce que contient la licence perpétuelle</li>
+        <li>Toutes les versions majeures, sans surcoût</li>
+        <li>Bibliothèque de composants enrichie chaque trimestre</li>
+        <li>Support par courriel sous 48 h</li>
+        <li>Trois postes de travail</li>
+      </ul>
+      <a class="btn" href="#acheter" data-plan="pro">S'abonner</a>
+    </div>
+  </div>
+
+  <p class="disclaimer" style="margin-top:26px" id="acheter">
+    <b>Le paiement n'est pas encore ouvert.</b> Les formules ci-dessus sont celles
+    prévues ; le moyen de paiement sera branché prochainement. En attendant,
+    l'application est utilisable gratuitement et sans compte —
+    <a href="./app/">ouvrez-la et faites tourner un vrai projet</a>.
+  </p>
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <span class="eyebrow">Questions</span>
+    <h2>Ce qu'on nous demande le plus souvent.</h2>
+  </div>
+
+  <details><summary>Les résultats sont-ils utilisables pour un dossier réel ?</summary>
+    <p>Les calculs suivent les méthodes de référence : Erbs et HDKR pour le gisement, NOCT
+      pour la température de cellule, la logique de l'IEC 62548 pour les chaînes, l'IEC
+      60364-5-52 pour les courants admissibles. Ils sont vérifiés par 29 tests automatiques.
+      Cela dit, comme pour tout outil de ce type, <b>les résultats restent indicatifs</b> :
+      toute installation doit être validée par un professionnel qualifié au regard des
+      normes applicables sur son marché. C'est écrit sur chaque planche et dans chaque
+      rapport.</p></details>
+
+  <details><summary>D'où viennent les données d'irradiation ?</summary>
+    <p>34 villes de référence sont livrées avec l'outil, avec leurs irradiations et
+      températures mensuelles. Ces valeurs sont destinées à l'avant-projet. Pour une étude
+      d'exécution, vous saisissez les données du site réel — PVGIS, NASA POWER, Meteonorm
+      ou une station locale — directement dans la section Gisement.</p></details>
+
+  <details><summary>Pourquoi la bibliothèque ne contient-elle pas les modèles du marché ?</summary>
+    <p>Volontairement. Une caractéristique recopiée devient fausse à la révision suivante
+      du produit, et un dimensionnement faux engage l'installateur. Par ailleurs les fiches
+      techniques et visuels des fabricants ne sont pas librement redistribuables. Solarys
+      livre des archétypes génériques exacts par construction, et vous créez votre
+      bibliothèque à partir des fiches de vos fournisseurs, en quelques minutes.</p></details>
+
+  <details><summary>Où sont stockés mes projets et ceux de mes clients ?</summary>
+    <p>Uniquement dans votre navigateur. Rien n'est envoyé à un serveur, aucun compte n'est
+      créé, aucune donnée client ne transite. Vous exportez vos projets en fichier pour les
+      sauvegarder ou les transférer sur un autre poste.</p></details>
+
+  <details><summary>Faut-il une connexion internet ?</summary>
+    <p>Seulement au premier chargement. Ensuite l'application s'installe sur l'appareil et
+      fonctionne entièrement hors ligne — utile sur un chantier sans réseau.</p></details>
+
+  <details><summary>Est-ce que ça remplace PVsyst ?</summary>
+    <p>Non, et ce n'est pas le but. PVsyst reste la référence pour une étude de productible
+      bancable devant un financeur, avec ombrage 3D détaillé. Solarys couvre ce que PVsyst
+      ne fait pas : l'ingénierie électrique et le dossier d'exécution. Beaucoup
+      d'installateurs utilisent les deux.</p></details>
+</div></section>
+
+<section class="cta-band"><div class="wrap">
+  <h2>Faites tourner un projet réel. Vous verrez en dix minutes.</h2>
+  <p>Gratuit, sans compte, dans votre navigateur.</p>
+  <div class="hero-cta"><a class="btn primary" href="./app/">Ouvrir Solarys</a></div>
+</div></section>
+
+<footer><div class="wrap">
+  <p class="disclaimer">
+    Solarys est un outil d'aide au dimensionnement. Les résultats qu'il produit sont
+    indicatifs et ne se substituent pas à l'étude d'un professionnel qualifié. Toute
+    installation électrique doit être conçue, vérifiée et réceptionnée conformément aux
+    normes en vigueur sur son marché.
+  </p>
+  <p>
+    © <span id="year">2026</span> Solarys · <a href="./app/">Application</a> ·
+    <a href="https://github.com/wajdibennaya5-max/Bro95/tree/main/solarys">Code source</a>
+  </p>
+</div></footer>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+</script>
+</body>
+</html>
