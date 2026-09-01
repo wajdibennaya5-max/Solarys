@@ -50,7 +50,7 @@ jobs:
         run: |
           mkdir -p _site
           # Tout le dépôt est publiable, sauf l'outillage de développement.
-          rsync -a --exclude '.git' --exclude '.github' \
+          rsync -a --exclude '/_site' --exclude '.git' --exclude '.github' \
                    --exclude 'app/tests' --exclude 'app/package.json' \
                    --exclude 'app/node_modules' --exclude 'app/README.md' \
                    ./ _site/
