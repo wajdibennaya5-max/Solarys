@@ -11,7 +11,7 @@ import { planView } from './plan2d.js';
 import { OBSTACLE_KINDS } from '../model/surface.js';
 import { readKey, format as formatKey, isUnlimited, isProjectUnlocked,
   canUnlock, remainingCredits } from '../licence.js';
-import { OFFRES, ORDRE, estOuverte } from '../boutique.js';
+import { OFFRES, ORDRE, estOuverte, lienAchat } from '../boutique.js';
 
 const cur = (p) => p.economics.currencySymbol || '€';
 const money = (v, p, d = 0) => `${fmt(v, d)} ${cur(p)}`;
@@ -593,12 +593,17 @@ function unlockCard(p, prefs) {
 function offersGrid() {
   const cartes = ORDRE.map((plan) => {
     const o = OFFRES[plan];
-    const achat = estOuverte(plan)
-      ? `<a class="btn primary offer-buy" href="${esc(o.lien)}"
-            target="_blank" rel="noopener noreferrer">${esc(t('licence.buyPlan'))}</a>`
+    const nom = t(`licence.plan.${plan}`);
+    const lien = lienAchat(plan, nom);
+    // Paiement en ligne, commande directe, ou rien : trois états, jamais un
+    // bouton qui mène nulle part.
+    const achat = lien
+      ? `<a class="btn primary offer-buy" href="${esc(lien)}"
+            target="_blank" rel="noopener noreferrer">${
+              esc(t(estOuverte(plan) ? 'licence.buyPlan' : 'licence.order'))}</a>`
       : `<span class="offer-soon">${esc(t('licence.soon'))}</span>`;
     return `<div class="offer">
-      <span class="offer-name">${esc(t(`licence.plan.${plan}`))}</span>
+      <span class="offer-name">${esc(nom)}</span>
       <span class="offer-price">${esc(o.prix)}<small>${esc(o.unite)}</small></span>
       <span class="offer-note">${esc(t(`licence.offer.${plan}`))}</span>
       ${achat}

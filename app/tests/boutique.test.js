@@ -69,3 +69,74 @@ test('tout lien renseigné est une adresse https', () => {
       `le lien de « ${plan} » doit être en https, sinon le navigateur bloquera le paiement`);
   }
 });
+
+/* ------------------------------------------------------------------ */
+/* Commande directe — vendre sans plateforme de paiement               */
+/* ------------------------------------------------------------------ */
+
+// `lienAchat` lit la configuration du module. Pour éprouver ses trois états
+// sans toucher au fichier livré, on recharge le module avec une configuration
+// modifiée en mémoire.
+async function avecConfig({ lien = '', whatsapp = '', courriel = '' }) {
+  const m = await import(`../js/boutique.js?essai=${Math.random()}`);
+  m.OFFRES.perpetual.lien = lien;
+  m.COMMANDE.whatsapp = whatsapp;
+  m.COMMANDE.courriel = courriel;
+  return m;
+}
+
+test('sans rien de branché, aucune formule ne mène nulle part', async () => {
+  const m = await avecConfig({});
+  assert.equal(m.lienAchat('perpetual'), null);
+  assert.equal(m.estVendable('perpetual'), false);
+  assert.equal(m.boutiqueOuverte(), false);
+});
+
+test('un numéro WhatsApp suffit à ouvrir la vente', async () => {
+  const m = await avecConfig({ whatsapp: '+216 12 345 678' });
+  const lien = m.lienAchat('perpetual', 'Licence perpétuelle');
+  assert.match(lien, /^https:\/\/wa\.me\/21612345678\?text=/);
+  // Le message doit nommer la formule et son prix : l'acheteur n'a rien à écrire.
+  const texte = decodeURIComponent(new URL(lien).searchParams.get('text'));
+  assert.match(texte, /Licence perpétuelle/);
+  assert.match(texte, /20 €/);
+  assert.equal(m.estVendable('perpetual'), true);
+  // Une commande directe n'est pas un paiement en ligne : le libellé diffère.
+  assert.equal(m.estOuverte('perpetual'), false);
+});
+
+test('le numéro est nettoyé de tout ce qui n\'est pas un chiffre', async () => {
+  const m = await avecConfig({ whatsapp: '+216-12.345 678' });
+  assert.match(m.lienAchat('perpetual'), /wa\.me\/21612345678\?/);
+});
+
+test('à défaut de WhatsApp, le courriel prend le relais', async () => {
+  const m = await avecConfig({ courriel: 'ventes@exemple.test' });
+  const lien = m.lienAchat('perpetual', 'Licence perpétuelle');
+  assert.match(lien, /^mailto:ventes@exemple\.test\?/);
+  assert.match(lien, /subject=/);
+  assert.match(decodeURIComponent(lien), /Licence perpétuelle/);
+});
+
+test('le paiement en ligne prime sur la commande directe', async () => {
+  // Sinon un acheteur prêt à payer serait renvoyé vers une attente humaine.
+  const m = await avecConfig({
+    lien: 'https://paiement.test/x', whatsapp: '21612345678',
+  });
+  assert.equal(m.lienAchat('perpetual'), 'https://paiement.test/x');
+  assert.equal(m.estOuverte('perpetual'), true);
+});
+
+test('une formule inconnue ne produit jamais de lien', async () => {
+  const m = await avecConfig({ whatsapp: '21612345678' });
+  assert.equal(m.lienAchat('formule-inexistante'), null);
+  assert.equal(m.estVendable('formule-inexistante'), false);
+});
+
+test('le message de commande survit aux caractères à échapper', async () => {
+  const m = await avecConfig({ whatsapp: '21612345678' });
+  const lien = m.lienAchat('perpetual', 'Licence « perpétuelle » & co');
+  assert.doesNotThrow(() => new URL(lien));
+  assert.match(decodeURIComponent(new URL(lien).searchParams.get('text')),
+    /Licence « perpétuelle » & co/);
+});

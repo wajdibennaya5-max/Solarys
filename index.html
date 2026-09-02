@@ -457,23 +457,37 @@ footer a{color:var(--text-2)}
   // La vitrine ne connaît ni les prix ni les liens : elle les lit dans la
   // boutique de l'application, pour qu'il n'existe qu'un seul endroit à
   // modifier le jour où le paiement s'ouvre.
-  import { OFFRES, estOuverte, boutiqueOuverte } from './app/js/boutique.js';
+  import { lienAchat, estOuverte, boutiqueOuverte } from './app/js/boutique.js';
 
   document.getElementById('year').textContent = new Date().getFullYear();
 
+  const NOMS = {
+    credits: 'Dossiers à l\u2019unité',
+    perpetual: 'Licence perpétuelle',
+    subscription: 'Abonnement Pro',
+  };
+
+  let paiementEnLigne = false;
   for (const bouton of document.querySelectorAll('[data-plan]')) {
     const plan = bouton.dataset.plan;
-    if (!estOuverte(plan)) continue;
-    bouton.href = OFFRES[plan].lien;
+    const lien = lienAchat(plan, NOMS[plan] ?? plan);
+    if (!lien) continue;
+    bouton.href = lien;
     bouton.target = '_blank';
     bouton.rel = 'noopener noreferrer';
+    if (estOuverte(plan)) paiementEnLigne = true;
+    else bouton.textContent = 'Commander';
   }
 
   if (boutiqueOuverte()) {
-    document.getElementById('acheter').innerHTML =
-      'Paiement sécurisé. La clé de licence arrive par courriel juste après '
-      + "l'achat, et s'active dans <a href=\"./app/\">l'application</a> — "
-      + 'onglet Réglages, champ « Clé de licence ».';
+    document.getElementById('acheter').innerHTML = paiementEnLigne
+      ? 'Paiement sécurisé. La clé de licence arrive par courriel juste après '
+        + "l'achat, et s'active dans <a href=\"./app/\">l'application</a> — "
+        + 'onglet Réglages, champ « Clé de licence ».'
+      : 'Votre commande nous parvient directement, et nous convenons du '
+        + "règlement avec vous. La clé s'active ensuite dans "
+        + '<a href="./app/">l\u2019application</a> — onglet Réglages, '
+        + 'champ « Clé de licence ».';
   }
 </script>
 </body>
