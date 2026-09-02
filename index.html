@@ -347,7 +347,7 @@ footer a{color:var(--text-2)}
         <li>Aucun engagement, aucune date de fin</li>
         <li>Le dossier payé le reste pour toujours</li>
       </ul>
-      <a class="btn primary" href="#acheter" data-plan="credits">Acheter un dossier</a>
+      <a class="btn primary" data-plan="credits" href="#acheter">Acheter un dossier</a>
       <p style="font-size:12.5px;color:var(--text-3);margin-top:-4px">
         Pour l'installateur qui rend deux ou trois études par an.
       </p>
@@ -362,7 +362,7 @@ footer a{color:var(--text-2)}
         <li>Version 1.x à vie, correctifs inclus</li>
         <li>Clé de licence livrée par courriel</li>
       </ul>
-      <a class="btn" href="#acheter" data-plan="perpetuelle">Acheter la licence</a>
+      <a class="btn" data-plan="perpetual" href="#acheter">Acheter la licence</a>
       <p style="font-size:12.5px;color:var(--text-3);margin-top:-4px">
         Réservé aux 100 premières licences. Passera ensuite à 99 €.
       </p>
@@ -378,7 +378,7 @@ footer a{color:var(--text-2)}
         <li>Support par courriel sous 48 h</li>
         <li>Trois postes de travail</li>
       </ul>
-      <a class="btn" href="#acheter" data-plan="pro">S'abonner</a>
+      <a class="btn" data-plan="subscription" href="#acheter">S'abonner</a>
     </div>
   </div>
 
@@ -449,12 +449,32 @@ footer a{color:var(--text-2)}
   </p>
   <p>
     © <span id="year">2026</span> Solarys · <a href="./app/">Application</a> ·
-    <a href="https://github.com/wajdibennaya5-max/Bro95/tree/main/solarys">Code source</a>
+    <a href="https://github.com/wajdibennaya5-max/Solarys">Code source</a>
   </p>
 </div></footer>
 
-<script>
+<script type="module">
+  // La vitrine ne connaît ni les prix ni les liens : elle les lit dans la
+  // boutique de l'application, pour qu'il n'existe qu'un seul endroit à
+  // modifier le jour où le paiement s'ouvre.
+  import { OFFRES, estOuverte, boutiqueOuverte } from './app/js/boutique.js';
+
   document.getElementById('year').textContent = new Date().getFullYear();
+
+  for (const bouton of document.querySelectorAll('[data-plan]')) {
+    const plan = bouton.dataset.plan;
+    if (!estOuverte(plan)) continue;
+    bouton.href = OFFRES[plan].lien;
+    bouton.target = '_blank';
+    bouton.rel = 'noopener noreferrer';
+  }
+
+  if (boutiqueOuverte()) {
+    document.getElementById('acheter').innerHTML =
+      'Paiement sécurisé. La clé de licence arrive par courriel juste après '
+      + "l'achat, et s'active dans <a href=\"./app/\">l'application</a> — "
+      + 'onglet Réglages, champ « Clé de licence ».';
+  }
 </script>
 </body>
 </html>

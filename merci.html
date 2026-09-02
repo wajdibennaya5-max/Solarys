@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Merci — Solarys</title>
+<link rel="icon" href="./icon.svg">
+<style>
+:root{
+  --bg:#0b0e14; --surface:#11151d; --surface-2:#171c26; --border:#262e3d;
+  --text-1:#e8ecf3; --text-2:#a4aec0; --text-3:#6f7a8d;
+  --accent:#f5a524; --accent-ink:#1a1204; --accent-soft:#f5a52418;
+  --good:#199e70; --bad:#e66767;
+  --font:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans Arabic',sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font);background:var(--bg);color:var(--text-1);
+  line-height:1.6;-webkit-font-smoothing:antialiased;
+  display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+main{width:100%;max-width:560px}
+.card{background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:32px 30px}
+.seal{width:46px;height:46px;border-radius:50%;background:var(--accent-soft);
+  border:1px solid var(--accent);display:grid;place-items:center;margin-bottom:18px}
+.seal svg{width:24px;height:24px;stroke:var(--accent);stroke-width:2.2;fill:none;
+  stroke-linecap:round;stroke-linejoin:round}
+h1{font-size:26px;line-height:1.25;margin:0 0 10px;letter-spacing:-.02em;text-wrap:balance}
+p{margin:0 0 14px;color:var(--text-2)}
+ol{margin:0 0 4px;padding-inline-start:20px;color:var(--text-2)}
+li{margin-bottom:9px}
+li b{color:var(--text-1)}
+.key-form{display:flex;gap:8px;margin:18px 0 6px;flex-wrap:wrap}
+input{flex:1 1 220px;min-width:0;background:var(--surface-2);color:var(--text-1);
+  border:1px solid var(--border);border-radius:9px;padding:11px 13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;
+  letter-spacing:.06em;text-transform:uppercase}
+input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:11px 18px;border-radius:9px;border:1px solid var(--border);
+  background:var(--surface-2);color:var(--text-1);font:inherit;font-weight:550;
+  text-decoration:none;cursor:pointer;white-space:nowrap}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.msg{font-size:13.5px;margin:0;min-height:20px}
+.msg.ok{color:var(--good)} .msg.ko{color:var(--bad)}
+.foot{margin-top:22px;padding-top:16px;border-top:1px solid var(--border);
+  font-size:13px;color:var(--text-3)}
+.foot a{color:var(--text-2)}
+@media (prefers-reduced-motion:no-preference){
+  .card{animation:rise .4s ease-out both}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}}
+}
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <div class="seal" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+    </div>
+
+    <h1>Merci — votre licence est active.</h1>
+    <p>Le paiement est enregistré. Il reste une étape, elle prend dix secondes.</p>
+
+    <ol>
+      <li>Votre <b>clé de licence</b> vous a été envoyée par courriel. Si elle
+        figure sur cette page ou sur le reçu, elle est également valable.</li>
+      <li>Collez-la ci-dessous, ou dans l'application : <b>Réglages → Clé de licence</b>.</li>
+      <li>Le filigrane « avant-projet » disparaît, et le cartouche des planches
+        porte votre marque.</li>
+    </ol>
+
+    <form class="key-form" id="form">
+      <label for="cle" class="sr-only" hidden>Clé de licence</label>
+      <input id="cle" name="cle" placeholder="SLRS-XXXX-XXXX-XXXX"
+             autocomplete="off" spellcheck="false" maxlength="19" required>
+      <button class="btn primary" type="submit">Activer</button>
+    </form>
+    <p class="msg" id="msg" role="status" aria-live="polite"></p>
+
+    <div class="foot">
+      <p style="margin:0">
+        La clé n'arrive pas ? Vérifiez les indésirables, puis écrivez-nous avec
+        votre numéro de commande. Elle est réémise sans frais.
+      </p>
+      <p style="margin:8px 0 0">
+        <a href="./app/">Ouvrir Solarys</a> · <a href="./">Retour à l'accueil</a>
+      </p>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+  // La page d'arrivée valide la clé avec le MÊME code que l'application :
+  // ce qui est accepté ici sera accepté là-bas, sans divergence possible.
+  import { readKey, format } from './app/js/licence.js';
+  import { storeLicence } from './app/js/prefs.js';
+  import { CONTACT } from './app/js/boutique.js';
+
+  const champ = document.getElementById('cle');
+  const msg = document.getElementById('msg');
+
+  // Certaines plateformes de paiement renvoient la clé dans l'adresse
+  // (…/merci.html?cle=SLRS-…) : on la pré-remplit alors pour l'acheteur.
+  const depuisUrl = new URLSearchParams(location.search).get('cle');
+  if (depuisUrl) champ.value = format(depuisUrl);
+
+  if (CONTACT) {
+    document.querySelector('.foot p').insertAdjacentHTML('beforeend',
+      ` <a href="mailto:${CONTACT}">${CONTACT}</a>`);
+  }
+
+  const NOMS = {
+    credits: 'Dossiers à l’unité',
+    perpetual: 'Licence perpétuelle',
+    subscription: 'Abonnement Pro',
+  };
+
+  document.getElementById('form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const lue = readKey(champ.value);
+    if (!lue.valid) {
+      msg.className = 'msg ko';
+      msg.textContent = 'Clé non reconnue. Vérifiez la saisie, ou écrivez-nous.';
+      return;
+    }
+    // On dépose la licence là où l'application la lira, en passant par le
+    // module de l'application elle-même : aucun nom d'espace de stockage
+    // n'est recopié ici, donc aucun risque de divergence.
+    if (!storeLicence(format(champ.value))) {
+      // Navigation privée, stockage refusé : la clé reste saisissable dans
+      // l'application. On ne bloque pas l'acheteur pour autant.
+      msg.className = 'msg ok';
+      msg.textContent = 'Clé valide. Saisissez-la dans Réglages → Clé de licence.';
+      return;
+    }
+    msg.className = 'msg ok';
+    msg.textContent = `${NOMS[lue.plan] ?? 'Licence'} activée. Ouverture…`;
+    setTimeout(() => { location.href = './app/'; }, 900);
+  });
+</script>
+</body>
+</html>

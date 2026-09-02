@@ -18,7 +18,6 @@ import * as cab from './core/cabling.js';
 import * as fin from './core/finance.js';
 
 const STORAGE_KEY = 'solarys.projects.v1';
-const PREFS_KEY = 'solarys.prefs.v1';
 
 /** Projet vierge avec des valeurs par défaut raisonnables. */
 export function blankProject() {
@@ -116,13 +115,9 @@ const writeJson = (key, value) => {
 
 export const loadProjects = () => readJson(STORAGE_KEY, []);
 export const saveProjects = (list) => writeJson(STORAGE_KEY, list);
-export const loadPrefs = () => readJson(PREFS_KEY, {
-  lang: 'fr', theme: 'dark', lastProjectId: null,
-  licence: null,
-  // Projets pour lesquels un crédit a été dépensé, formule à l'unité.
-  unlockedProjects: [],
-});
-export const savePrefs = (p) => writeJson(PREFS_KEY, p);
+// Les préférences vivent dans `prefs.js`, sans dépendance : la page d'arrivée
+// après paiement y dépose la licence sans charger le moteur de calcul.
+export { loadPrefs, savePrefs } from './prefs.js';
 
 /** Enregistre un projet (création ou mise à jour) et renvoie la liste. */
 export function upsertProject(project) {

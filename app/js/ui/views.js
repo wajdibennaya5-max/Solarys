@@ -11,6 +11,7 @@ import { planView } from './plan2d.js';
 import { OBSTACLE_KINDS } from '../model/surface.js';
 import { readKey, format as formatKey, isUnlimited, isProjectUnlocked,
   canUnlock, remainingCredits } from '../licence.js';
+import { OFFRES, ORDRE, estOuverte } from '../boutique.js';
 
 const cur = (p) => p.economics.currencySymbol || '€';
 const money = (v, p, d = 0) => `${fmt(v, d)} ${cur(p)}`;
@@ -584,20 +585,30 @@ function unlockCard(p, prefs) {
     `<p class="notice warn">${esc(t('licence.watermarked'))}</p>${action}`);
 }
 
-/** Les trois formules payantes, présentées côte à côte. */
+/**
+ * Les trois formules payantes, présentées côte à côte.
+ * Chacune mène au paiement dès qu'un lien est renseigné dans `boutique.js` ;
+ * sinon elle le dit, au lieu d'ouvrir une page morte.
+ */
 function offersGrid() {
-  const offres = [
-    { plan: 'credits', prix: '9 €', unite: '/ dossier' },
-    { plan: 'perpetual', prix: '20 €', unite: 'une fois' },
-    { plan: 'subscription', prix: '149 €', unite: '/ an' },
-  ];
-  return `<div class="offers">${offres.map((o) => `<div class="offer">
-      <span class="offer-name">${esc(t(`licence.plan.${o.plan}`))}</span>
+  const cartes = ORDRE.map((plan) => {
+    const o = OFFRES[plan];
+    const achat = estOuverte(plan)
+      ? `<a class="btn primary offer-buy" href="${esc(o.lien)}"
+            target="_blank" rel="noopener noreferrer">${esc(t('licence.buyPlan'))}</a>`
+      : `<span class="offer-soon">${esc(t('licence.soon'))}</span>`;
+    return `<div class="offer">
+      <span class="offer-name">${esc(t(`licence.plan.${plan}`))}</span>
       <span class="offer-price">${esc(o.prix)}<small>${esc(o.unite)}</small></span>
-      <span class="offer-note">${esc(t(`licence.offer.${o.plan}`))}</span>
-    </div>`).join('')}</div>
+      <span class="offer-note">${esc(t(`licence.offer.${plan}`))}</span>
+      ${achat}
+    </div>`;
+  }).join('');
+
+  return `<div class="offers">${cartes}</div>
     <div class="row-actions">
-      <button class="btn primary" data-view="settings">${esc(t('licence.activate'))}</button>
+      <button class="btn" data-view="settings">${esc(t('licence.activate'))}</button>
+      <span class="field-hint">${esc(t('licence.alreadyBought'))}</span>
     </div>`;
 }
 
@@ -706,7 +717,8 @@ export function settings(prefs) {
         <div class="row-actions">
           <button class="btn primary" data-action="activateLicence">${esc(t('licence.activate'))}</button>
         </div>
-        <p class="notice info">${esc(t('licence.hint'))}</p>`}`);
+        <p class="notice info">${esc(t('licence.hint'))}</p>
+        ${offersGrid()}`}`);
 
   return licence + card(t('settings.title'), grid(
     `<label class="field"><span class="field-label">${esc(t('settings.language'))}</span>
