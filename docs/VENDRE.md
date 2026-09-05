@@ -88,8 +88,16 @@ Trois chemins, du plus simple au plus contraignant.
 
 ### USDT en direct
 
-Dans Bybit : *Dépôt → USDT → choisir le réseau*. Copier l'adresse **et** noter
-le réseau, puis les mettre dans `PAIEMENT.usdt`.
+**Déjà configuré** — l'adresse de dépôt TRON et son réseau sont dans
+`PAIEMENT.usdt`, et chaque commande les annonce à l'acheteur. Un test valide
+la somme de contrôle de l'adresse à chaque exécution de la suite : si un
+caractère venait à changer, les tests échoueraient avant qu'un client n'envoie
+quoi que ce soit dans le vide.
+
+Pour la changer un jour : dans Bybit, *Dépôt → USDT → choisir le réseau*,
+copier l'adresse **et** noter le réseau, puis les reporter dans
+`PAIEMENT.usdt`. Ne la recopiez jamais à l'œil depuis une capture d'écran —
+lancez `npm test` après.
 
 Deux points sur lesquels on ne se rattrape pas :
 
@@ -97,7 +105,9 @@ Deux points sur lesquels on ne se rattrape pas :
   ne dessert pas est perdu, définitivement. C'est pour cela que le réseau est
   annoncé au client en même temps que l'adresse.
 - **Rien ne confirme le paiement à votre place.** Vous vérifiez l'arrivée dans
-  Bybit, ou sur l'explorateur de chaîne, avant d'émettre la clé.
+  Bybit avant d'émettre la clé — un dépôt est crédité après 20 confirmations,
+  soit environ une minute sur TRON. N'émettez jamais une clé sur la foi d'une
+  capture d'écran envoyée par l'acheteur : elle ne prouve rien.
 
 ### Virement ou espèces, puis P2P
 
