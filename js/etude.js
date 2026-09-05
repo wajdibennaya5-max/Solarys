@@ -12,6 +12,8 @@
  */
 import { productible, productionMensuelle } from './gisement.js';
 import { facteurOrientation } from './orientation.js';
+import { autoconsommationDe, TYPE_DEFAUT } from './batiment.js';
+import { evite, eviteSurDuree } from './co2.js';
 
 /**
  * HYPOTHÈSES ÉCONOMIQUES — à vérifier avant toute mise en ligne, et à revoir
@@ -165,6 +167,7 @@ export function puissanceRecommandee({
 export function etudier({
   consommationAnnuelle, montantAnnuel, gouvernorat, surfaceDisponible = 0,
   puissance = null, orientation = null, pente = null, hypotheses = HYPOTHESES,
+  batiment = TYPE_DEFAUT,
 }) {
   const prixKwh = prixDuKwh({ consommationAnnuelle, montantAnnuel });
   const rendement = productible(gouvernorat);
@@ -182,8 +185,15 @@ export function etudier({
   // Ce qui est consommé directement vaut le prix d'achat ; le reste est
   // injecté et ne vaut que le prix de rachat. La part autoconsommée dépend
   // de la taille de l'installation, pas d'une constante : voir la courbe.
+  // À midi, une maison est vide et un atelier tourne : le même toit ne
+  // consomme pas la même part de ce qu'il produit. Ignorer cela annonçait
+  // à une entreprise la rentabilité d'un logement — plusieurs années
+  // d'écart sur le retour.
+  const reference = hypotheses.autoconsommation === HYPOTHESES.autoconsommation
+    ? autoconsommationDe(batiment)
+    : hypotheses.autoconsommation;
   const ratio = production / consommation;
-  const taux = tauxAutoconsommation(ratio, hypotheses.autoconsommation);
+  const taux = tauxAutoconsommation(ratio, reference);
   const autoconsomme = Math.min(consommation, production * taux);
   const surplus = Math.max(0, production - autoconsomme);
   const economieAn1 = autoconsomme * prixKwh
@@ -223,6 +233,12 @@ export function etudier({
     ratio,
     /** Part de la production réellement consommée sur place. */
     tauxAutoconsommation: taux,
+    /** Le type de bâtiment retenu, et le taux de référence qui en découle. */
+    batiment,
+    autoconsommationReference: reference,
+    /** CO₂ évité, en kilogrammes. */
+    co2Annuel: evite(production),
+    co2SurDuree: eviteSurDuree(production, hypotheses.duree, hypotheses.degradation),
     autoconsomme: Math.round(autoconsomme),
     surplus: Math.round(surplus),
     economieAnnuelle: economieAn1,

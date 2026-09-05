@@ -43,7 +43,7 @@ export const VISEES = {
 export const PROFILS = [
   {
     cle: 'economique',
-    nom: 'Économique',
+    nom: 'Essentiel',
     promesse: 'Le meilleur rapport, le remboursement le plus rapide',
     detail: 'Presque tout ce que vous produisez, vous le consommez : rien '
       + 'ne part sur le réseau au prix de rachat. C’est l’investissement le '
@@ -59,8 +59,8 @@ export const PROFILS = [
   },
   {
     cle: 'performance',
-    nom: 'Performance',
-    promesse: 'De la marge pour demain, le gain le plus élevé',
+    nom: 'Maximum solaire',
+    promesse: 'Toute la toiture utile, le gain le plus élevé',
     detail: 'Une installation dimensionnée au-delà de vos besoins actuels : '
       + 'climatisation, véhicule électrique, agrandissement. Le retour est '
       + 'plus long, le gain sur vingt-cinq ans est le plus important.',
