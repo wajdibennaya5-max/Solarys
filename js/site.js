@@ -12,7 +12,10 @@ import { localiser, REFUS } from './geo.js';
 import { planCalepinage } from './calepinage.js';
 import { ORIENTATIONS, PENTES, expliquerOrientation } from './orientation.js';
 import { MOIS } from './gisement.js';
-import { PERIODES, REPERES, versAnnuel, verifier as verifierFacture } from './facture.js';
+import { PERIODES, REPERES } from './facture.js';
+import { METHODES, FIABILITES, resoudre, verifier as verifierConso, methode }
+  from './consommation.js';
+import { QUESTIONS } from './profil.js';
 import { construireGraphe, grapheMensuel } from './graphe.js';
 import { OFFRE, CONTACT, ouverte, redigerDemande, lienDemande, champsManquants,
   envoyerAuServeur, API } from './prospect.js';
@@ -21,6 +24,233 @@ import { comparer, scenarioParDefaut, ecart } from './scenarios.js';
 
 const $ = (id) => document.getElementById(id);
 const reponses = {};
+
+/**
+ * LE SCHÉMA DE LA FACTURE — dessiné, pas photographié.
+ *
+ * Deux cases se ressemblent sur une facture STEG : « Total Electricité » et
+ * « Montant à payer ». La seconde peut contenir des arriérés d'anciennes
+ * factures, et fausserait toute l'économie annoncée. Montrer où regarder
+ * évite l'erreur mieux qu'une phrase qui la décrit.
+ */
+const SCHEMA_FACTURE = `    <svg viewBox="0 0 320 150" class="facture-schema" role="img"
+      aria-label="Extrait d’une facture STEG : la colonne Quantité et la case Total Electricité">
+      <rect x="1" y="1" width="318" height="148" rx="6" fill="var(--surface)"
+        stroke="var(--bord)" stroke-width="1.5"/>
+      <text x="12" y="20" class="fs-titre">CONSOMMATION &amp; SERVICES</text>
+      <line x1="12" y1="27" x2="308" y2="27" stroke="var(--bord)" stroke-width="1"/>
+      <text x="16" y="42" class="fs-tete">Libellés</text>
+      <text x="118" y="42" class="fs-tete">Index</text>
+      <text x="192" y="42" class="fs-tete">Quantité</text>
+      <text x="262" y="42" class="fs-tete">Montant</text>
+      <rect x="186" y="30" width="52" height="40" rx="4" fill="none"
+        stroke="var(--accent)" stroke-width="2"/>
+      <text x="16" y="60" class="fs-val">Électricité</text>
+      <text x="118" y="60" class="fs-pale">16338</text>
+      <text x="196" y="60" class="fs-fort">590</text>
+      <text x="262" y="60" class="fs-val">128,620</text>
+      <text x="212" y="84" text-anchor="middle" class="fs-note">1 — kWh consommés</text>
+      <rect x="12" y="96" width="166" height="26" rx="5" fill="none"
+        stroke="var(--accent)" stroke-width="2"/>
+      <text x="20" y="113" class="fs-fort">Total Electricité</text>
+      <text x="172" y="113" text-anchor="end" class="fs-fort">132,820</text>
+      <text x="95" y="136" text-anchor="middle" class="fs-note">2 — le montant à saisir</text>
+      <text x="196" y="113" class="fs-pale">Montant à payer</text>
+      <text x="308" y="113" text-anchor="end" class="fs-pale">554,000</text>
+      <text x="250" y="136" text-anchor="middle" class="fs-barre">pas celui-ci</text>
+    </svg>`;
+
+/** La méthode de saisie retenue, et ce qui a été tapé dans chacune. */
+let methodeConso = 'facture';
+const saisieConso = { facture: {}, mensuel: {}, montant: {}, profil: {} };
+
+/** Les douze cases du relevé mensuel. */
+const casesMois = () => MOIS.map((m, i) => `<label class="mois">
+  <span>${m}</span>
+  <input id="mois${i}" type="number" inputmode="numeric" min="0" max="20000"
+    step="1" aria-label="Consommation de ${m} en kilowattheures">
+</label>`).join('');
+
+/** Le formulaire propre à chaque méthode. */
+function formulaireConso(id) {
+  if (id === 'facture') {
+    return `${SCHEMA_FACTURE}
+    <div class="champ">
+      <label for="quantite">1 — Quantité (kWh)</label>
+      <input id="quantite" name="quantite" type="number" inputmode="numeric"
+        min="1" step="1" placeholder="${REPERES.quantite.exemple}">
+      <p class="indice">${REPERES.quantite.aide}</p>
+    </div>
+    <div class="champ">
+      <label for="montant">2 — Total Électricité (DT)</label>
+      <input id="montant" name="montant" type="number" inputmode="decimal"
+        min="0" step="0.001" placeholder="${REPERES.montant.exemple}">
+      <p class="indice">${REPERES.montant.aide}</p>
+    </div>
+    <div class="champ">
+      <label for="periode">Vous recevez une facture</label>
+      <select id="periode" name="periode">
+        ${PERIODES.map((pp) => `<option value="${pp.id}"${
+          pp.defaut ? ' selected' : ''}>${pp.nom}</option>`).join('')}
+      </select>
+    </div>`;
+  }
+
+  if (id === 'mensuel') {
+    return `<p class="indice">Vos consommations mensuelles, en kWh. L’espace
+      client STEG les conserve ; laissez vides les mois que vous ignorez.</p>
+    <div class="mois-grille">${casesMois()}</div>`;
+  }
+
+  if (id === 'montant') {
+    return `<div class="champ">
+      <label for="mMontant">Ce que vous payez habituellement (DT)</label>
+      <input id="mMontant" type="number" inputmode="decimal" min="0" step="0.5"
+        placeholder="340">
+      <p class="indice">Le montant d’une facture ordinaire, arriérés exclus.</p>
+    </div>
+    <div class="champ">
+      <label for="mPeriode">Vous recevez une facture</label>
+      <select id="mPeriode">
+        ${PERIODES.map((pp) => `<option value="${pp.parAn}"${
+          pp.defaut ? ' selected' : ''}>${pp.nom}</option>`).join('')}
+      </select>
+    </div>`;
+  }
+
+  if (id === 'profil') {
+    return `<p class="indice">Sans facture, on estime à partir du logement.
+      Les ordres de grandeur sont justes ; une facture les rendrait exacts.</p>
+    ${QUESTIONS.map((q) => (q.type === 'oui-non'
+      ? `<label class="bascule"><input type="checkbox" id="p_${q.cle}"${
+          q.defaut ? ' checked' : ''}><span>${q.libelle}</span></label>`
+      : `<div class="champ">
+          <label for="p_${q.cle}">${q.libelle}</label>
+          <input id="p_${q.cle}" type="number" inputmode="numeric" min="0"
+            step="1" value="${q.defaut}">
+        </div>`)).join('')}`;
+  }
+  return '';
+}
+
+/** Ce que le formulaire courant contient, dans la forme attendue du calcul. */
+function lireSaisieConso(id) {
+  if (id === 'facture') {
+    return {
+      quantite: $('quantite')?.value ?? '',
+      montant: $('montant')?.value ?? '',
+      periode: $('periode')?.value ?? 'bimestrielle',
+    };
+  }
+  if (id === 'mensuel') {
+    // Une case vide n'est pas un zéro : elle ne compte pas, là où un zéro
+    // saisi est une information — un mois d'absence, par exemple.
+    return { mois: MOIS.map((_, i) => {
+      const v = $(`mois${i}`)?.value;
+      return v === '' || v === undefined || v === null ? null : Number(v);
+    }) };
+  }
+  if (id === 'montant') {
+    return { montant: $('mMontant')?.value ?? '', parAn: Number($('mPeriode')?.value) || 6 };
+  }
+  if (id === 'profil') {
+    const lu = {};
+    for (const q of QUESTIONS) {
+      const champ = $(`p_${q.cle}`);
+      lu[q.cle] = q.type === 'oui-non' ? !!champ?.checked : Number(champ?.value);
+    }
+    return lu;
+  }
+  return {};
+}
+
+/** Remet dans le formulaire ce qui y avait été tapé. */
+function remplirSaisieConso(id, v = {}) {
+  if (id === 'facture') {
+    if ($('quantite')) $('quantite').value = v.quantite ?? '';
+    if ($('montant')) $('montant').value = v.montant ?? '';
+    if ($('periode')) $('periode').value = v.periode ?? 'bimestrielle';
+    return;
+  }
+  if (id === 'mensuel') {
+    MOIS.forEach((_, i) => {
+      const champ = $(`mois${i}`);
+      if (champ) champ.value = v.mois?.[i] ?? '';
+    });
+    return;
+  }
+  if (id === 'montant') {
+    if ($('mMontant')) $('mMontant').value = v.montant ?? '';
+    if ($('mPeriode') && v.parAn) $('mPeriode').value = String(v.parAn);
+    return;
+  }
+  if (id === 'profil') {
+    for (const q of QUESTIONS) {
+      const champ = $(`p_${q.cle}`);
+      if (!champ) continue;
+      const valeur = v[q.cle];
+      if (q.type === 'oui-non') champ.checked = valeur === undefined ? q.defaut : !!valeur;
+      else champ.value = valeur === undefined ? q.defaut : valeur;
+    }
+  }
+}
+
+/**
+ * L'APERÇU VIVANT — l'hypothèse affichée plutôt que cachée.
+ *
+ * Trois des quatre méthodes déduisent le prix du kilowattheure d'une grille
+ * tarifaire au lieu de le lire sur une facture. Une hypothèse affichée, le
+ * client la reconnaît ou la corrige ; une hypothèse cachée se découvre à sa
+ * première facture, quand il est trop tard pour nous croire.
+ */
+function apercuConso() {
+  const zone = $('apercuConso');
+  if (!zone) return;
+  const saisie = lireSaisieConso(methodeConso);
+  saisieConso[methodeConso] = saisie;
+  const r = resoudre(methodeConso, saisie);
+  if (!r) { zone.innerHTML = ''; zone.hidden = true; return; }
+  zone.hidden = false;
+  const f = FIABILITES[r.fiabilite];
+  zone.innerHTML = `<b>${r.consommationAnnuelle.toLocaleString('fr-FR')} kWh par an</b>,
+    soit ${r.prixKwh.toFixed(3).replace('.', ',')} DT le kilowattheure.
+    <span class="ap-source">${r.detail}</span>
+    ${r.fiabilite === 'facture' ? '' : `<span class="ap-avert">${f.phrase}</span>`}`;
+}
+
+/** Redessine le formulaire de la méthode retenue et rebranche ses écoutes. */
+function dessinerFormConso() {
+  const hote = $('formConso');
+  if (!hote) return;
+  hote.innerHTML = formulaireConso(methodeConso);
+  remplirSaisieConso(methodeConso, saisieConso[methodeConso]);
+  for (const chip of document.querySelectorAll('#methodes [data-methode]')) {
+    const actif = chip.dataset.methode === methodeConso;
+    chip.classList.toggle('choisi', actif);
+    chip.setAttribute('aria-checked', String(actif));
+  }
+  apercuConso();
+}
+
+function brancherConsommation() {
+  const choix = $('methodes');
+  if (!choix) return;
+  choix.addEventListener('click', (ev) => {
+    const chip = ev.target.closest('[data-methode]');
+    if (!chip || chip.dataset.methode === methodeConso) return;
+    // Ce qui a été tapé dans l'ancienne méthode est gardé : revenir en
+    // arrière ne doit pas coûter une deuxième saisie.
+    saisieConso[methodeConso] = lireSaisieConso(methodeConso);
+    methodeConso = chip.dataset.methode;
+    $('erreur').textContent = '';
+    dessinerFormConso();
+  });
+  // Une seule écoute sur le conteneur : le formulaire est redessiné à chaque
+  // changement de méthode, des écoutes posées sur les champs fuiraient.
+  $('formConso')?.addEventListener('input', apercuConso);
+  $('formConso')?.addEventListener('change', apercuConso);
+  dessinerFormConso();
+}
 
 /**
  * Les étapes, dans l'ordre.
@@ -50,69 +280,30 @@ const ETAPES = [
     valide: (v) => (v ? null : 'Choisissez votre gouvernorat pour continuer.'),
   },
   {
-    cle: 'facture',
-    titre: 'Prenez votre dernière facture STEG',
-    aide: 'Deux nombres à recopier — rien à calculer, rien à connaître par cœur.',
-    champ: () => `
-    <svg viewBox="0 0 320 150" class="facture-schema" role="img"
-      aria-label="Extrait d’une facture STEG : la colonne Quantité et la case Total Electricité">
-      <rect x="1" y="1" width="318" height="148" rx="6" fill="var(--surface)"
-        stroke="var(--bord)" stroke-width="1.5"/>
-      <text x="12" y="20" class="fs-titre">CONSOMMATION &amp; SERVICES</text>
-      <line x1="12" y1="27" x2="308" y2="27" stroke="var(--bord)" stroke-width="1"/>
-      <text x="16" y="42" class="fs-tete">Libellés</text>
-      <text x="118" y="42" class="fs-tete">Index</text>
-      <text x="192" y="42" class="fs-tete">Quantité</text>
-      <text x="262" y="42" class="fs-tete">Montant</text>
-      <rect x="186" y="30" width="52" height="40" rx="4" fill="none"
-        stroke="var(--accent)" stroke-width="2"/>
-      <text x="16" y="60" class="fs-val">Électricité</text>
-      <text x="118" y="60" class="fs-pale">16338</text>
-      <text x="196" y="60" class="fs-fort">590</text>
-      <text x="262" y="60" class="fs-val">128,620</text>
-      <text x="212" y="84" text-anchor="middle" class="fs-note">1 — kWh consommés</text>
-      <rect x="12" y="96" width="166" height="26" rx="5" fill="none"
-        stroke="var(--accent)" stroke-width="2"/>
-      <text x="20" y="113" class="fs-fort">Total Electricité</text>
-      <text x="172" y="113" text-anchor="end" class="fs-fort">132,820</text>
-      <text x="95" y="136" text-anchor="middle" class="fs-note">2 — le montant à saisir</text>
-      <text x="196" y="113" class="fs-pale">Montant à payer</text>
-      <text x="308" y="113" text-anchor="end" class="fs-pale">554,000</text>
-      <text x="250" y="136" text-anchor="middle" class="fs-barre">pas celui-ci</text>
-    </svg>
-    <div class="champ">
-      <label for="quantite">1 — Quantité (kWh)</label>
-      <input id="quantite" name="quantite" type="number" inputmode="numeric"
-        min="1" step="1" placeholder="${REPERES.quantite.exemple}">
-      <p class="indice">${REPERES.quantite.aide}</p>
+    cle: 'consommation',
+    titre: 'Que consommez-vous ?',
+    aide: 'Le mieux, c’est votre dernière facture : deux nombres à recopier. '
+      + 'Si vous ne l’avez pas, trois autres chemins mènent au même endroit.',
+    champ: () => `<div class="methodes" id="methodes" role="radiogroup"
+      aria-label="Comment renseigner votre consommation">
+      ${METHODES.map((m) => `<button type="button" class="chip" role="radio"
+        aria-checked="false" data-methode="${m.id}">
+        <b>${m.nom}</b><span>${m.resume}</span>
+        ${m.conseil ? '<i class="chip-conseil">le plus précis</i>' : ''}
+      </button>`).join('')}
     </div>
-    <div class="champ">
-      <label for="montant">2 — Total Électricité (DT)</label>
-      <input id="montant" name="montant" type="number" inputmode="decimal"
-        min="0" step="0.001" placeholder="${REPERES.montant.exemple}">
-      <p class="indice">${REPERES.montant.aide}</p>
-    </div>
-    <div class="champ">
-      <label for="periode">Vous recevez une facture</label>
-      <select id="periode" name="periode">
-        ${PERIODES.map((p) => `<option value="${p.id}"${
-          p.defaut ? ' selected' : ''}>${p.nom}</option>`).join('')}
-      </select>
-    </div>
+    <div id="formConso"></div>
+    <p class="apercu" id="apercuConso" role="status" aria-live="polite" hidden></p>
     <details class="repli"><summary>Je n’ai pas ma facture sous la main</summary>
       <p>Vous la retrouvez dans l’espace client STEG, ou sur le papier reçu par
-      la poste. Toutes les factures portent ces deux nombres au même endroit ;
-      n’importe laquelle des six de l’année convient.</p></details>`,
-    lire: () => ({
-      quantite: $('quantite')?.value ?? '',
-      montant: $('montant')?.value ?? '',
-      periode: $('periode')?.value ?? 'bimestrielle',
-    }),
-    valide: (v) => verifierFacture(v),
+      la poste. N’importe laquelle des six factures de l’année convient. Sinon,
+      choisissez « Ce que je paie » ou « Je n’ai pas de facture » ci-dessus :
+      l’étude sera une estimation, et elle le dira.</p></details>`,
+    lire: () => ({ methode: methodeConso, saisie: lireSaisieConso(methodeConso) }),
+    valide: (v) => verifierConso(v.methode, v.saisie),
     restaure: (v) => {
-      if ($('quantite')) $('quantite').value = v.quantite ?? '';
-      if ($('montant')) $('montant').value = v.montant ?? '';
-      if ($('periode')) $('periode').value = v.periode ?? 'bimestrielle';
+      if (v.methode && methode(v.methode)) methodeConso = v.methode;
+      if (v.saisie) saisieConso[methodeConso] = v.saisie;
     },
   },
   {
@@ -294,6 +485,7 @@ function dessinerEtape() {
   }
   brancherLocalisation();
   brancherOrientation();
+  brancherConsommation();
 }
 
 /** Dit à l'écran ce que l'orientation choisie coûte, avant même le résultat. */
@@ -362,11 +554,14 @@ let simulation = { puissance: null, surface: 0 };
  */
 function donneesEtude() {
   const toit = reponses.toit ?? {};
-  const annuel = versAnnuel(reponses.facture ?? {});
+  const c = reponses.consommation ?? {};
+  const annuel = resoudre(c.methode, c.saisie ?? {});
   if (!annuel) return null;
   return {
     consommationAnnuelle: annuel.consommationAnnuelle,
     montantAnnuel: annuel.montantAnnuel,
+    fiabilite: annuel.fiabilite,
+    detailConso: annuel.detail,
     gouvernorat: reponses.gouvernorat,
     surfaceDisponible: simulation.surface,
     orientation: toit.orientation ?? null,
@@ -447,6 +642,7 @@ function dessinerResultat() {
   $('resultat').innerHTML = `
     <h3 style="text-align:center;font-size:27px;margin-bottom:9px" id="titreRes"></h3>
     <p class="sous-titre" style="margin-bottom:0" id="sousRes"></p>
+    <p class="fiabilite" id="fiabilite" hidden></p>
 
     <div class="chiffres" id="chiffres"></div>
 
@@ -598,6 +794,17 @@ function rafraichir() {
   ].map(([v, l, fort]) => `<div class="chiffre${fort ? ' fort' : ''}">
     <span class="v">${v}</span><span class="l">${l}</span></div>`).join('');
 
+  // D'où vient le chiffre de départ, dit avant tous les autres chiffres.
+  // Une estimation présentée comme une certitude se retourne contre nous à
+  // la première facture du client.
+  const source = donneesEtude();
+  const f = source && FIABILITES[source.fiabilite];
+  $('fiabilite').hidden = !f;
+  if (f) {
+    $('fiabilite').className = `fiabilite f-${source.fiabilite}`;
+    $('fiabilite').innerHTML = `<b>${f.nom}</b> — ${f.phrase}`;
+  }
+
   $('graphe').innerHTML = construireGraphe(e, { largeur: 620, hauteur: 250 }).svg;
 
   dessinerScenarios();
@@ -637,6 +844,7 @@ function rafraichir() {
   }
 
   $('detail').innerHTML = [
+    ...(source?.detailConso ? [['D’où vient votre consommation', source.detailConso]] : []),
     ['Ce que vous payez le kilowattheure', e.prixKwh.toFixed(3).replace('.', ',') + ' DT'],
     ['Production estimée', e.production.toLocaleString('fr-FR') + ' kWh / an'],
     [`Zone solaire (${lieu})`, `${zoneSolaire(reponses.gouvernorat)} — ${e.productible} kWh/kWc`],

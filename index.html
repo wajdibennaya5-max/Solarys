@@ -172,6 +172,7 @@ input,select{width:100%;padding:14px 15px;font:inherit;font-size:16px;
 input:focus-visible,select:focus-visible{outline:none;border-color:var(--argile);
   box-shadow:0 0 0 4px rgba(200,74,33,.14)}
 .champ+.champ{margin-top:18px}
+.indice+.champ,.indice+.bascule{margin-top:16px}
 .indice{margin-top:7px;font-size:13.5px;color:var(--encre-3)}
 .erreur{margin-top:10px;font-size:14.5px;color:var(--argile);min-height:20px}
 .actions{display:flex;gap:12px;margin-top:26px}
@@ -183,7 +184,53 @@ input:focus-visible,select:focus-visible{outline:none;border-color:var(--argile)
 .repli summary::-webkit-details-marker{display:none}
 .repli summary::before{content:'? ';font-weight:800;color:var(--argile)}
 .repli p{margin-top:10px}
+#tunnel,#resultat{scroll-margin-top:84px}
 .facture-schema{width:100%;height:auto;margin-bottom:20px;border-radius:12px}
+
+/* Le choix de la méthode de saisie : quatre portes, une conseillée. */
+.methodes{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;
+  margin-bottom:22px}
+.chip{position:relative;display:flex;flex-direction:column;gap:3px;text-align:left;font:inherit;
+  color:inherit;background:var(--surface);border:1.5px solid var(--bord);border-radius:13px;
+  padding:13px 14px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.chip:hover{border-color:var(--or)}
+.chip:focus-visible{outline:3px solid var(--or);outline-offset:2px}
+.chip b{font-size:14.5px;font-weight:700;color:var(--nuit);line-height:1.25}
+.chip span{font-size:12.5px;color:var(--encre-3);line-height:1.35}
+.chip-conseil{font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--argile);margin-top:2px}
+.chip.choisi{border-color:var(--argile);border-width:2px;padding:12px 13px;
+  box-shadow:0 6px 18px rgba(200,74,33,.13)}
+
+/* Le relevé mois par mois. */
+.mois-grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:9px;
+  margin-top:14px}
+.mois{display:flex;flex-direction:column;gap:4px}
+.mois span{font-size:12px;font-weight:600;color:var(--encre-2)}
+.mois input{width:100%;padding:9px 10px;font-size:15px;border:1.5px solid var(--bord);
+  border-radius:9px;background:var(--surface);color:var(--encre);font-family:inherit}
+.mois input:focus{outline:none;border-color:var(--argile)}
+
+/* Les questions par oui ou par non. */
+.bascule{display:flex;align-items:center;gap:11px;margin-top:16px;cursor:pointer;
+  font-size:15.5px;font-weight:600;color:var(--encre)}
+.bascule input{width:20px;height:20px;accent-color:var(--argile);flex:none}
+
+/* L'aperçu vivant : ce que la saisie donne, avant même de valider. */
+.apercu{margin-top:18px;background:var(--douce);border-left:3px solid var(--or);
+  border-radius:0 11px 11px 0;padding:13px 15px;font-size:14.5px;line-height:1.55;
+  color:var(--encre)}
+.apercu b{color:var(--nuit);font-weight:800}
+.apercu .ap-source,.apercu .ap-avert{display:block;margin-top:6px;font-size:13px;
+  color:var(--encre-2)}
+.apercu .ap-avert{color:var(--argile);font-weight:600}
+
+/* La fiabilité de l'étude, dite avant tous les chiffres. */
+.fiabilite{max-width:640px;margin:14px auto 0;text-align:center;font-size:14px;line-height:1.6;
+  color:var(--encre-2);background:var(--douce);border-radius:12px;padding:12px 16px}
+.fiabilite b{color:var(--nuit);font-weight:800}
+.fiabilite.f-estimation{background:#fdf1e4;color:#7a4318}
+.fiabilite.f-estimation b{color:var(--argile)}
 .fs-titre{font-family:var(--titre);font-size:9px;font-weight:800;fill:var(--encre-2);
   letter-spacing:.06em}
 .fs-tete{font-size:7.5px;fill:var(--encre-3);font-weight:700}
