@@ -94,7 +94,8 @@ header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--fond)
 .preuves div{display:flex;align-items:center;gap:11px}
 .preuves svg{width:20px;height:20px;flex:none;stroke:var(--or);fill:none;
   stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.scene{filter:drop-shadow(0 22px 44px rgba(0,0,0,.34))}
+.scene img{border-radius:18px;box-shadow:0 22px 50px rgba(0,0,0,.34);
+  width:100%;height:auto;display:block}
 
 section{padding:78px 0}
 section.douce{background:var(--douce)}
@@ -291,47 +292,14 @@ footer .bas{margin-top:36px;padding-top:20px;border-top:1px solid rgba(255,255,2
           Résultat immédiat, et modifiable</div>
       </div>
     </div>
-    <div class="scene" aria-hidden="true">
-  <svg viewBox="0 0 460 360" fill="none">
-    <!-- Le soleil et ses rayons : la source, en haut à droite. -->
-    <circle cx="374" cy="66" r="30" fill="#e8a33d"/>
-    <g stroke="#e8a33d" stroke-width="4" stroke-linecap="round" opacity=".62">
-      <path d="M374 14v-8M374 126v8M426 66h8M314 66h-8M411 29l6-6M331 109l-6 6M411 103l6 6M331 23l-6-6"/>
-    </g>
-    <!-- Trois rayons obliques vers la toiture. -->
-    <g stroke="#e8a33d" stroke-width="2.6" stroke-linecap="round" opacity=".3">
-      <path d="M350 100 250 190M372 112 286 196M326 92 224 176"/>
-    </g>
-    <!-- Le sol. -->
-    <path d="M12 300h436" stroke="#12525c" stroke-width="3" stroke-linecap="round" opacity=".5"/>
-    <!-- La maison. -->
-    <path d="M60 300V178l112-72 112 72v122z" fill="#0a3a42"/>
-    <path d="M46 184 172 100l126 84" stroke="#12525c" stroke-width="9"
-      stroke-linejoin="round" stroke-linecap="round" fill="none"/>
-    <!-- Porte et fenêtre, pour qu'on lise « maison » et non « boîte ». -->
-    <rect x="150" y="240" width="44" height="60" rx="4" fill="#06282e"/>
-    <rect x="88" y="216" width="40" height="36" rx="4" fill="#12525c"/>
-    <rect x="216" y="216" width="40" height="36" rx="4" fill="#12525c"/>
-    <!-- Le champ photovoltaïque : deux rangées sur le rampant sud. -->
-    <g transform="skewY(-32) translate(0 172)">
-      <rect x="182" y="46" width="46" height="30" rx="2.5" fill="#164e5a" stroke="#2b7d8c" stroke-width="1.6"/>
-      <rect x="232" y="46" width="46" height="30" rx="2.5" fill="#164e5a" stroke="#2b7d8c" stroke-width="1.6"/>
-      <rect x="182" y="80" width="46" height="30" rx="2.5" fill="#164e5a" stroke="#2b7d8c" stroke-width="1.6"/>
-      <rect x="232" y="80" width="46" height="30" rx="2.5" fill="#164e5a" stroke="#2b7d8c" stroke-width="1.6"/>
-      <g stroke="#2b7d8c" stroke-width="1" opacity=".8">
-        <path d="M205 46v30M205 80v30M255 46v30M255 80v30M182 61h46M232 61h46M182 95h46M232 95h46"/>
-      </g>
-    </g>
-    <!-- Le compteur qui recule : l'argument, en une image. -->
-    <rect x="322" y="214" width="86" height="86" rx="14" fill="#0c2a30" stroke="#12525c" stroke-width="2"/>
-    <rect x="336" y="230" width="58" height="26" rx="5" fill="#06282e"/>
-    <text x="365" y="249" text-anchor="middle" fill="#e8a33d"
-      font-family="ui-monospace,monospace" font-size="15" font-weight="700">-68%</text>
-    <path d="M348 276h34" stroke="#c84a21" stroke-width="4" stroke-linecap="round"/>
-    <path d="M356 268l-8 8 8 8" stroke="#c84a21" stroke-width="4"
-      stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  </svg>
-</div>
+    <div class="scene">
+      <picture>
+        <source media="(min-width:900px)" srcset="./images/maison-solaire-1280.jpg">
+        <img src="./images/maison-solaire-780.jpg" width="1280" height="720"
+          alt="Maison méditerranéenne à toiture de tuiles, équipée de panneaux
+            photovoltaïques posés en rangées régulières" loading="eager" decoding="async">
+      </picture>
+    </div>
   </div>
 </div>
 
