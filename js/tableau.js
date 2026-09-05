@@ -239,3 +239,127 @@ export function panneauTechnique(dim, verdict) {
       descend plus bas : vérifiez la température minimale avant de commander.</p>
   </details>`;
 }
+
+/* ------------------------------------------------------------------ */
+/* Le moteur, rendu visible                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * LE BANDEAU DE NIVEAU — ce que cette étude vaut, dit avant elle.
+ *
+ * Un visiteur qui n'a donné que sa ville et sa facture reçoit un chiffre
+ * exact à l'écran. Rien ne lui dit que ce chiffre repose sur un toit supposé
+ * plein sud et dégagé. Le bandeau le dit, et propose l'action qui ferait
+ * monter l'étude d'un cran — pas un reproche, une marche à gravir.
+ */
+export function bandeauNiveau(sim) {
+  if (!sim?.niveau?.niveau) return '';
+  const n = sim.niveau;
+  const c = sim.confiance;
+  return `<div class="niveau niveau-${n.niveau.id}">
+    <div class="niveau-tete">
+      <span class="niveau-rang">Niveau ${n.niveau.rang} sur 3</span>
+      <span class="niveau-nom">${n.niveau.nom}</span>
+      ${c ? `<span class="niveau-conf niveau-conf-${c.niveau}">Confiance des
+        données : ${c.note} / 100</span>` : ''}
+    </div>
+    <p class="niveau-phrase">${n.niveau.phrase}</p>
+    ${c ? `<p class="niveau-conf-txt">${c.phrase}</p>` : ''}
+    ${n.pourMonter.length ? `<p class="niveau-monter"><b>Pour passer au niveau
+      ${n.suivant.rang} — ${n.suivant.nom.toLowerCase()} :</b>
+      ${n.pourMonter.map((m) => m.nom.toLowerCase()).join(', ')}.</p>` : ''}
+    ${c ? `<details class="niveau-detail"><summary>Ce qui compose la confiance</summary>
+      <dl>${c.facteurs.map((f) => `<div>
+        <dt>${f.nom}</dt><dd>${f.obtenu} / ${f.poids}</dd>
+        <p>${f.note}</p></div>`).join('')}</dl></details>` : ''}
+  </div>`;
+}
+
+/**
+ * LES ALERTES DU PROJET, chacune avec ses quatre parties.
+ *
+ * Repliées quand tout va bien, ouvertes dès qu'il y a un bloquant : une
+ * alerte qui décide du projet ne doit pas attendre qu'on la cherche.
+ */
+export function panneauAlertes(sim) {
+  const alertes = sim?.avertissements ?? [];
+  if (!alertes.length) return '';
+  const c = { bloquant: 0, important: 0, information: 0 };
+  for (const a of alertes) c[a.gravite] += 1;
+  const signes = { bloquant: '✕', important: '⚠', information: 'i' };
+  const resume = [
+    c.bloquant ? `${c.bloquant} bloquant${c.bloquant > 1 ? 's' : ''}` : null,
+    c.important ? `${c.important} à corriger` : null,
+    c.information ? `${c.information} à savoir` : null,
+  ].filter(Boolean).join(' · ');
+
+  return `<details class="alertes" id="panneauAlertes" ${c.bloquant ? 'open' : ''}>
+    <summary>
+      <span class="al-titre">Analyse du projet</span>
+      <span class="al-resume ${c.bloquant ? 'al-rouge' : c.important ? 'al-or' : ''}"
+        >${resume}</span>
+    </summary>
+    <div class="al-liste">
+      ${alertes.map((a) => `<div class="al al-${a.gravite}">
+        <p class="al-probleme"><span class="al-signe">${signes[a.gravite]}</span>
+          ${a.probleme}</p>
+        <p class="al-pourquoi">${a.pourquoi}</p>
+        <dl class="al-donnees">${a.donnees.map(([k, v]) => `<div>
+          <dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+        <p class="al-action"><b>Ce que vous pouvez faire :</b> ${a.action}</p>
+      </div>`).join('')}
+    </div>
+  </details>`;
+}
+
+/**
+ * « D'OÙ VIENT CE CHIFFRE ? » — la traçabilité, ouvrable ligne par ligne.
+ *
+ * C'est la question qui décide de tout dans ce métier. Une étude qu'on peut
+ * ouvrir se défend devant un installateur ; une étude qu'on doit croire se
+ * conteste.
+ */
+export function panneauTracabilite(sim) {
+  if (!sim?.tracabilite?.length) return '';
+  const parCle = Object.fromEntries((sim.hypotheses ?? []).map((h) => [h.cle, h]));
+  return `<details class="tracabilite" id="panneauTrace">
+    <summary><span class="tr-titre">D’où vient chaque chiffre</span>
+      <span class="tr-note">moteur de calcul v${sim.version}</span></summary>
+    <div class="tr-liste">
+      ${sim.tracabilite.map((t) => `<div class="tr">
+        <p class="tr-tete"><span class="tr-nom">${t.nom}</span>
+          <span class="tr-val">${t.valeur}</span></p>
+        <p class="tr-methode">${t.methode}</p>
+        <dl class="tr-params">${t.parametres.map(([k, v]) => `<div>
+          <dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+        ${t.hypotheses.length ? `<p class="tr-hyp">Repose sur : ${
+          t.hypotheses.map((h) => parCle[h]
+            ? `${parCle[h].nom.toLowerCase()}${parCle[h].verifiee ? '' : ' (non vérifiée)'}`
+            : h).join(', ')}.</p>` : ''}
+      </div>`).join('')}
+    </div>
+  </details>`;
+}
+
+/** Les hypothèses, toutes, avec leur source et leur état de vérification. */
+export function panneauHypotheses(sim) {
+  if (!sim?.hypotheses?.length) return '';
+  const aVerifier = sim.hypotheses.filter((h) => !h.verifiee).length;
+  return `<details class="hypotheses" id="panneauHypotheses">
+    <summary><span class="hy-titre">Hypothèses de calcul</span>
+      <span class="hy-note">${sim.hypotheses.length} paramètres, ${
+        aVerifier} non vérifiés</span></summary>
+    <table class="hy-table"><tbody>
+      ${sim.hypotheses.map((h) => `<tr class="${h.verifiee ? '' : 'hy-doute'}">
+        <th scope="row">${h.nom}<span class="hy-src">${h.source}</span></th>
+        <td>${typeof h.valeur === 'number'
+          ? h.valeur.toLocaleString('fr-FR', { maximumFractionDigits: 3 })
+          : (h.valeur ?? '—')}${h.unite ? ` ${h.unite}` : ''}
+          <span class="hy-etat">${h.verifiee ? 'vérifiée' : 'à vérifier'}</span></td>
+      </tr>`).join('')}
+    </tbody></table>
+    <p class="hy-pied">« À vérifier » ne veut pas dire faux : cela veut dire que
+      la valeur n’a pas été relue sur un document officiel en vigueur. C’est
+      là qu’un installateur doit porter son attention.</p>
+  </details>`;
+}

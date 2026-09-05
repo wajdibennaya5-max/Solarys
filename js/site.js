@@ -20,7 +20,9 @@ import { TYPES, typeBatiment, TYPE_DEFAUT, consommationMensuelle } from './batim
 import { MODULES, MODULE_DEFAUT, moduleParId } from './materiel.js';
 import { POSES, optimiser } from './calepinage.js';
 import { carteCentrale, grilleKpi, carteScore, avertissement, phraseCo2,
-  panneauTechnique } from './tableau.js';
+  panneauTechnique, bandeauNiveau, panneauAlertes, panneauTracabilite,
+  panneauHypotheses } from './tableau.js';
+import { simuler } from './moteur.js';
 import { dimensionner, verdictGlobal } from './technique.js';
 import { construireRapport } from './rapport.js';
 import { reponses, simulation, reinitialiserSimulation, cotesToit, reglagePose,
@@ -921,6 +923,9 @@ function dessinerResultat() {
     <div id="kpis"></div>
     <p class="dash-co2" id="phraseCo2"></p>
 
+    <div id="bandeauNiveau"></div>
+    <div id="blocAlertes"></div>
+
     <div class="bloc" id="blocScenarios">
       <h4>Trois façons de dimensionner votre toiture</h4>
       <p class="note">Le même toit, le même soleil, la même facture : seule la
@@ -986,6 +991,8 @@ function dessinerResultat() {
     <div class="bloc">
       <h4>Le détail</h4>
       <dl id="detail"></dl>
+      <div id="zoneTrace"></div>
+      <div id="zoneHypotheses"></div>
       <div id="panneauTechnique"></div>
       <div id="avertissement"></div>
     </div>
@@ -1032,7 +1039,7 @@ function dessinerResultat() {
     // recommandation : la carte centrale le dit plutôt que de s'attribuer
     // un chiffre qu'elle n'a pas proposé.
     simulation.sienne = true;
-    rafraichir();
+    demanderRafraichissement();
   });
 
   // Une seule écoute sur le conteneur : les cartes sont redessinées à chaque
@@ -1061,7 +1068,7 @@ function dessinerResultat() {
         Math.floor(max / PUISSANCE.pas) * PUISSANCE.pas);
       cP.value = simulation.puissance;
     }
-    rafraichir();
+    demanderRafraichissement();
   });
 
   rafraichir();
@@ -1150,6 +1157,27 @@ function brancherRapport() {
     $('nom')?.focus({ preventScroll: true });
   });
 }
+
+/**
+ * LE RAFRAÎCHISSEMENT EST ÉTALÉ SUR L'IMAGE SUIVANTE.
+ *
+ * Un doigt qui glisse sur le curseur émet jusqu'à soixante événements par
+ * seconde, et chacun reconstruisait cinq graphiques SVG et trois panneaux.
+ * Sur un Android d'entrée de gamme, le curseur décrochait. On ne garde que
+ * le dernier état demandé, et on le dessine une fois par image.
+ */
+let imageEnAttente = null;
+
+function demanderRafraichissement() {
+  if (imageEnAttente !== null) return;
+  imageEnAttente = requestAnimationFrame(() => {
+    imageEnAttente = null;
+    rafraichir();
+  });
+}
+
+/** La dernière simulation complète, pour l'assistant et le rapport. */
+let simulationCourante = null;
 
 /** Redessine tout ce qui dépend des curseurs. */
 function rafraichir() {
@@ -1266,6 +1294,19 @@ function rafraichir() {
   // Un curseur déplacé ne doit pas refermer le panneau qu'on était en train
   // de lire.
   if (ouvertAvant && $('technique')) $('technique').open = true;
+
+  // LE MOTEUR passe une fois par rafraîchissement, et alimente tout ce qui
+  // explique l'étude : niveau, confiance, alertes, traçabilité, hypothèses.
+  simulationCourante = simuler({ ...(source ?? {}),
+    moduleId: reglagePose().module.id }, { puissance: simulation.puissance });
+  const ouverts = new Set([...document.querySelectorAll('#resultat details[open]')]
+    .map((d) => d.id).filter(Boolean));
+  $('bandeauNiveau').innerHTML = bandeauNiveau(simulationCourante);
+  $('blocAlertes').innerHTML = panneauAlertes(simulationCourante);
+  $('zoneTrace').innerHTML = panneauTracabilite(simulationCourante);
+  $('zoneHypotheses').innerHTML = panneauHypotheses(simulationCourante);
+  // Un panneau qu'on lisait ne doit pas se refermer parce qu'un curseur a bougé.
+  for (const id of ouverts) { const d = $(id); if (d) d.open = true; }
 
   $('avertissement').innerHTML = avertissement(e, HYPOTHESES);
 

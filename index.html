@@ -574,6 +574,102 @@ input:focus-visible,select:focus-visible{outline:none;border-color:var(--argile)
   a[href]::after{content:''}
 }
 
+/* ── Niveau d'étude, confiance ───────────────────────────────────── */
+.niveau{margin:18px 0;border:1.5px solid var(--bord);border-left-width:4px;border-radius:14px;
+  padding:16px 18px;background:var(--surface)}
+.niveau-rapide{border-left-color:var(--repere)}
+.niveau-avance{border-left-color:var(--or)}
+.niveau-pro{border-left-color:#4d9166}
+.niveau-tete{display:flex;flex-wrap:wrap;align-items:baseline;gap:9px 14px}
+.niveau-rang{font-size:11px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--encre-3)}
+.niveau-nom{font-family:var(--titre);font-size:16.5px;font-weight:800;color:var(--nuit)}
+.niveau-conf{margin-left:auto;font-size:11.5px;font-weight:800;border-radius:99px;
+  padding:4px 11px;white-space:nowrap}
+.niveau-conf-haute{background:#e4f2e8;color:#2f6b43}
+.niveau-conf-moyenne{background:#fdf1e4;color:#8a5a1c}
+.niveau-conf-basse{background:#fbe6e1;color:#9c3418}
+.niveau-phrase{font-size:14px;color:var(--encre-2);line-height:1.6;margin-top:8px}
+.niveau-conf-txt{font-size:13px;color:var(--encre-3);line-height:1.55;margin-top:6px}
+.niveau-monter{font-size:13.5px;color:var(--nuit);background:var(--douce);border-radius:9px;
+  padding:9px 12px;margin-top:11px;line-height:1.55}
+.niveau-detail{margin-top:10px}
+.niveau-detail summary{cursor:pointer;font-size:12.5px;font-weight:700;color:var(--encre-2);
+  list-style:none}
+.niveau-detail summary::-webkit-details-marker{display:none}
+.niveau-detail summary::before{content:'+ ';color:var(--argile);font-weight:800}
+.niveau-detail[open] summary::before{content:'– '}
+.niveau-detail dl{display:block;margin-top:8px;font-size:12.5px}
+.niveau-detail dl>div{display:grid;grid-template-columns:1fr auto;border-top:1px solid var(--bord);
+  padding:7px 0}
+.niveau-detail dt{color:var(--encre-2);font-weight:700}
+.niveau-detail dd{margin:0;font-weight:800;color:var(--nuit);
+  font-variant-numeric:tabular-nums}
+.niveau-detail dl p{grid-column:1/-1;color:var(--encre-3);margin-top:2px}
+
+/* ── Alertes du projet ───────────────────────────────────────────── */
+.alertes,.tracabilite,.hypotheses{margin-top:16px;border:1.5px solid var(--bord);
+  border-radius:14px;background:var(--surface);overflow:hidden}
+.alertes summary,.tracabilite summary,.hypotheses summary{display:flex;align-items:center;
+  justify-content:space-between;gap:12px;flex-wrap:wrap;cursor:pointer;padding:14px 16px;
+  list-style:none;background:var(--douce)}
+.alertes summary::-webkit-details-marker,.tracabilite summary::-webkit-details-marker,
+.hypotheses summary::-webkit-details-marker{display:none}
+.al-titre,.tr-titre,.hy-titre{font-size:13.5px;font-weight:800;color:var(--nuit)}
+.al-titre::before,.tr-titre::before,.hy-titre::before{content:'+ ';color:var(--argile)}
+details[open]>summary .al-titre::before,details[open]>summary .tr-titre::before,
+details[open]>summary .hy-titre::before{content:'– '}
+.al-resume,.tr-note,.hy-note{font-size:11.5px;font-weight:700;color:var(--encre-3);
+  white-space:nowrap}
+.al-resume.al-or{color:#8a5a1c}
+.al-resume.al-rouge{color:#9c3418}
+.al-liste{display:grid;gap:12px;padding:16px}
+.al{border-left:3px solid var(--bord);border-radius:0 11px 11px 0;padding:12px 14px;
+  background:var(--fond)}
+.al-bloquant{border-left-color:var(--argile);background:#fdf6f4}
+.al-important{border-left-color:var(--or);background:#fffaf2}
+.al-information{border-left-color:var(--repere)}
+.al-signe{font-weight:800;margin-right:7px}
+.al-bloquant .al-signe{color:#9c3418}
+.al-important .al-signe{color:#8a5a1c}
+.al-information .al-signe{color:var(--encre-3)}
+.al-probleme{font-size:14.5px;font-weight:800;color:var(--nuit);line-height:1.4}
+.al-pourquoi{font-size:13px;color:var(--encre-2);line-height:1.55;margin-top:6px}
+.al-donnees{display:grid;gap:2px;margin:9px 0;font-size:12.5px}
+.al-donnees>div{display:flex;justify-content:space-between;gap:10px;
+  border-top:1px solid var(--bord);padding:5px 0}
+.al-donnees dt{color:var(--encre-3)}
+.al-donnees dd{margin:0;font-weight:800;color:var(--nuit);text-align:right;
+  font-variant-numeric:tabular-nums}
+.al-action{font-size:13px;color:var(--nuit);line-height:1.55}
+
+/* ── Traçabilité et hypothèses ───────────────────────────────────── */
+.tr-liste{display:grid;gap:12px;padding:16px}
+.tr{border-top:1px solid var(--bord);padding-top:11px}
+.tr:first-child{border-top:none;padding-top:0}
+.tr-tete{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.tr-nom{font-size:14px;font-weight:800;color:var(--nuit)}
+.tr-val{font-family:var(--titre);font-size:15px;font-weight:800;color:var(--argile);
+  white-space:nowrap;font-variant-numeric:tabular-nums}
+.tr-methode{font-size:12.5px;color:var(--encre-2);line-height:1.55;margin-top:4px}
+.tr-params{display:grid;gap:1px;margin-top:8px;font-size:12px}
+.tr-params>div{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
+.tr-params dt{color:var(--encre-3)}
+.tr-params dd{margin:0;font-weight:700;color:var(--encre);text-align:right;
+  font-variant-numeric:tabular-nums}
+.tr-hyp{font-size:11.5px;color:var(--encre-3);margin-top:6px;font-style:italic}
+.hy-table{width:calc(100% - 32px);margin:8px 16px 12px;border-collapse:collapse;font-size:13px}
+.hy-table th,.hy-table td{border-top:1px solid var(--bord);padding:9px 0;text-align:left;
+  vertical-align:top}
+.hy-table th{font-weight:700;color:var(--encre-2);width:58%}
+.hy-table td{font-weight:800;color:var(--nuit);text-align:right;
+  font-variant-numeric:tabular-nums}
+.hy-src{display:block;font-size:11.5px;font-weight:400;color:var(--encre-3);margin-top:2px}
+.hy-etat{display:block;font-size:10.5px;font-weight:700;color:#2f6b43;margin-top:2px}
+.hy-doute .hy-etat{color:#8a5a1c}
+.hy-doute td{color:var(--encre)}
+.hy-pied{font-size:12px;color:var(--encre-3);line-height:1.55;padding:0 16px 16px}
+
 /* Le squelette de chargement. */
 .squelette{display:flex;flex-direction:column;gap:10px;padding:6px 0}
 .squelette span{height:13px;border-radius:7px;
