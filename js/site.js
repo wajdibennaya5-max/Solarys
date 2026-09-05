@@ -10,7 +10,9 @@ import { etudier, HYPOTHESES, PUISSANCE } from './etude.js';
 import { formater, formaterRond } from './prix.js';
 import { localiser, REFUS } from './geo.js';
 import { planCalepinage } from './calepinage.js';
-import { construireGraphe } from './graphe.js';
+import { ORIENTATIONS, PENTES, expliquerOrientation } from './orientation.js';
+import { MOIS } from './gisement.js';
+import { construireGraphe, grapheMensuel } from './graphe.js';
 import { OFFRE, CONTACT, ouverte, redigerDemande, lienDemande, champsManquants,
   envoyerAuServeur, API } from './prospect.js';
 
@@ -90,6 +92,41 @@ const ETAPES = [
     },
   },
   {
+    cle: 'toit',
+    titre: 'Comment est orienté votre toit ?',
+    aide: 'C’est ce qui pèse le plus : un pan plein est produit 17 % de moins qu’un plein sud.',
+    champ: () => `<div class="champ">
+      <label for="pente">Forme du toit</label>
+      <select id="pente" name="pente">
+        ${PENTES.map((p) => `<option value="${p.id}"${
+          p.id === 'moyenne' ? ' selected' : ''}>${p.nom}</option>`).join('')}
+      </select>
+    </div>
+    <div class="champ" id="champOrientation">
+      <label for="orientation">Vers où regarde le pan principal ?</label>
+      <select id="orientation" name="orientation">
+        ${ORIENTATIONS.map((o) => `<option value="${o.id}"${
+          o.id === 'sud' ? ' selected' : ''}>${o.nom}</option>`).join('')}
+      </select>
+      <p class="indice" id="noteOrientation"></p>
+    </div>
+    <details class="repli"><summary>Je ne sais pas l’orientation</summary>
+      <p>Placez-vous devant votre maison, face à la façade principale. Au milieu
+      de la journée, le soleil est au sud : le pan qui reçoit le plus de soleil
+      à midi est le bon. Dans le doute, laissez « Plein sud » — l’étude détaillée
+      le vérifiera sur place.</p></details>`,
+    lire: () => ({
+      pente: $('pente')?.value ?? 'moyenne',
+      orientation: $('orientation')?.value ?? 'sud',
+    }),
+    valide: () => null,
+    restaure: (v) => {
+      if ($('pente')) $('pente').value = v.pente ?? 'moyenne';
+      if ($('orientation')) $('orientation').value = v.orientation ?? 'sud';
+      majOrientation();
+    },
+  },
+  {
     cle: 'toiture',
     titre: 'Quelles sont les cotes de votre toiture ?',
     aide: 'Facultatif — mais c’est ce qui permet de placer les panneaux sur VOTRE toit.',
@@ -151,6 +188,27 @@ function dessinerEtape() {
     saisi.focus({ preventScroll: true });
   }
   brancherLocalisation();
+  brancherOrientation();
+}
+
+/** Dit à l'écran ce que l'orientation choisie coûte, avant même le résultat. */
+function majOrientation() {
+  const note = $('noteOrientation');
+  if (!note) return;
+  const pente = $('pente')?.value;
+  const orientation = $('orientation')?.value;
+  note.textContent = expliquerOrientation(orientation, pente) ?? '';
+  // Sur une terrasse, l'orientation du bâtiment ne joue plus : la demander
+  // ferait croire qu'elle compte.
+  const champ = $('champOrientation');
+  if (champ) champ.hidden = pente === 'plat';
+}
+
+function brancherOrientation() {
+  for (const id of ['pente', 'orientation']) {
+    $(id)?.addEventListener('change', majOrientation);
+  }
+  majOrientation();
 }
 
 /**
@@ -192,12 +250,15 @@ let simulation = { puissance: null, surface: 0 };
 
 /** Recalcule l'étude avec les réglages courants. */
 function etudeCourante() {
+  const toit = reponses.toit ?? {};
   return etudier({
     consommationAnnuelle: Number(reponses.consommation),
     montantAnnuel: Number(reponses.montant),
     gouvernorat: reponses.gouvernorat,
     surfaceDisponible: simulation.surface,
     puissance: simulation.puissance,
+    orientation: toit.orientation ?? null,
+    pente: toit.pente ?? null,
   });
 }
 
@@ -243,6 +304,12 @@ function dessinerResultat() {
         </div>
       </div>
       <p class="indice" id="noteSurface" style="margin-top:14px"></p>
+    </div>
+
+    <div class="bloc" id="blocMensuel">
+      <h4>Ce que vous produirez, mois par mois</h4>
+      <p class="note" id="noteMensuel"></p>
+      <div class="graphe" id="grapheMensuel"></div>
     </div>
 
     <div class="bloc" id="blocToit" hidden>
@@ -348,6 +415,18 @@ function rafraichir() {
         (simulation.surface / HYPOTHESES.surfaceParKwc).toFixed(1).replace('.', ',')} kWc.`
     : `Sans contrainte de toiture, comptez ${HYPOTHESES.surfaceParKwc} m² par kWc.`;
 
+  // La production mensuelle : elle rassure sur l'hiver, que tout le monde
+  // croit nul.
+  const mensuel = e.mensuel && grapheMensuel(e.mensuel, MOIS, { largeur: 620, hauteur: 190 });
+  $('blocMensuel').hidden = !mensuel;
+  if (mensuel) {
+    $('grapheMensuel').innerHTML = mensuel;
+    const maxi = Math.max(...e.mensuel), mini = Math.min(...e.mensuel);
+    const part = Math.round((mini / maxi) * 100);
+    $('noteMensuel').textContent = `Le mois le plus creux produit encore ${part} % `
+      + `du mois le plus plein : l’hiver tunisien reste largement utile.`;
+  }
+
   // Le plan du toit, quand le visiteur a donné ses cotes.
   const toit = reponses.toiture ?? {};
   const trace = (toit.L && toit.P) ? planCalepinage(toit.L, toit.P, { largeurPx: 560 }) : null;
@@ -369,6 +448,10 @@ function rafraichir() {
     ['Consommé sur place / injecté',
       `${e.autoconsomme.toLocaleString('fr-FR')} / ${e.surplus.toLocaleString('fr-FR')} kWh`],
     ['Économie la première année', formater(e.economieAnnuelle)],
+    ...(e.facteurOrientation < 1
+      ? [['Effet de l’orientation',
+          `−${Math.round((1 - e.facteurOrientation) * 100)} % par rapport au plein sud`]]
+      : []),
   ].map(([t, d]) => `<dt>${t}</dt><dd>${d}</dd>`).join('');
 
   // La demande doit transporter l'étude que le visiteur a sous les yeux,
@@ -435,7 +518,7 @@ function dessinerDemande(etude) {
     $('erreurDemande').textContent = '';
 
     const r = await envoyerAuServeur({
-      client, etude, toiture: reponses.toiture, gouvernorat: lieu });
+      client, etude, toiture: reponses.toiture, toit: reponses.toit, gouvernorat: lieu });
 
     if (r.ok) {
       $('demande').innerHTML = `<div style="margin-top:24px;background:rgba(255,255,255,.08);

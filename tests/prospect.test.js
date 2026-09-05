@@ -18,9 +18,11 @@ test('la demande porte l\'étude entière, pour chiffrer sans rappeler', () => {
     '3 kWc', '6 modules', '18 m²', '0,250 DT/kWh']) {
     assert.ok(t.includes(attendu), `manquant dans la demande : ${attendu}`);
   }
-  // Milliers séparés par une espace fine insécable (U+202F).
+  // Milliers séparés par une espace fine insécable (U+202F). La production
+  // se recalcule : elle suit le productible, qu'on affine.
   assert.match(t, /4\u202f800 kWh\/an/);
-  assert.match(t, /4\u202f920 kWh\/an/);
+  assert.ok(t.includes(ETUDE.production.toLocaleString('fr-FR')),
+    `production ${ETUDE.production} absente de la demande`);
 });
 
 test('la demande payante annonce son prix, sans millimes trompeurs', () => {
@@ -163,4 +165,15 @@ test('une demande acceptée rend sa référence', async () => {
       client: { nom: 'X', telephone: '20123456' }, etude: ETUDE, toiture: {} });
     assert.deepEqual(r, { ok: true, reference: 'WT-0509-1976' });
   } finally { globalThis.fetch = initial; }
+});
+
+test('l\'orientation du toit accompagne l\'étude', async () => {
+  // Elle pèse davantage que tout le reste : le vendeur doit l'avoir avant
+  // de chiffrer, pas la découvrir sur place.
+  const { chiffresEtude } = await import('../js/prospect.js');
+  const c = chiffresEtude(ETUDE, {}, { orientation: 'est', pente: 'moyenne' });
+  assert.deepEqual(c.toit, { orientation: 'est', pente: 'moyenne' });
+  assert.equal(chiffresEtude(ETUDE, {}, {}).toit, undefined);
+  assert.equal(chiffresEtude(ETUDE, {}, { orientation: 'est' }).toit, undefined,
+    'une orientation sans pente ne suffit pas');
 });

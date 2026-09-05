@@ -111,3 +111,47 @@ export function construireGraphe(etude, { largeur = 620, hauteur = 260 } = {}) {
 
   return { svg, points };
 }
+
+
+/**
+ * La production mois par mois, en barres.
+ *
+ * Un client qui ne voit qu'un total annuel se demande ce que donne décembre —
+ * et croit souvent que l'hiver ne produit rien. La courbe répond, et elle
+ * rassure : le mois le plus creux produit encore près de la moitié du plus
+ * plein. Seuls les deux extrêmes sont chiffrés : un nombre sur chaque barre
+ * ferait un mur de chiffres que personne ne lit.
+ */
+export function grapheMensuel(mensuel, mois, { largeur = 620, hauteur = 190 } = {}) {
+  if (!Array.isArray(mensuel) || mensuel.length !== 12) return null;
+
+  const m = { haut: 26, droite: 10, bas: 26, gauche: 10 };
+  const zoneL = largeur - m.gauche - m.droite;
+  const zoneH = hauteur - m.haut - m.bas;
+  const maxi = Math.max(...mensuel);
+  const mini = Math.min(...mensuel);
+  if (!(maxi > 0)) return null;
+
+  // Un intervalle entre barres, pour qu'elles se lisent comme douze objets
+  // et non comme une masse.
+  const pas = zoneL / 12;
+  const largeurBarre = pas * 0.62;
+
+  const barres = mensuel.map((v, i) => {
+    const h = (v / maxi) * zoneH;
+    const x = m.gauche + i * pas + (pas - largeurBarre) / 2;
+    const y = m.haut + zoneH - h;
+    const fort = v === maxi || v === mini;
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}"
+      width="${largeurBarre.toFixed(1)}" height="${Math.max(2, h).toFixed(1)}"
+      rx="3" fill="${fort ? 'var(--accent)' : 'var(--aire-pleine)'}"/>
+      ${fort ? `<text x="${(x + largeurBarre / 2).toFixed(1)}" y="${(y - 7).toFixed(1)}"
+        text-anchor="middle" class="g-fort">${v.toLocaleString('fr-FR')}</text>` : ''}
+      <text x="${(x + largeurBarre / 2).toFixed(1)}" y="${(hauteur - 8).toFixed(1)}"
+        text-anchor="middle" class="g-etiq">${mois[i]}</text>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${largeur} ${hauteur}" role="img"
+    aria-label="Production mensuelle, de ${mini} kWh au plus bas à ${maxi} kWh au plus haut"
+    preserveAspectRatio="xMidYMid meet">${barres}</svg>`;
+}

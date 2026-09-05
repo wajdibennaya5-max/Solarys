@@ -110,7 +110,9 @@ test('une étude complète tient debout de bout en bout', () => {
   const e = etudier(FOYER);
   assert.ok(e, 'étude non produite');
   assert.equal(e.puissance, 3);
-  assert.equal(e.production, 4920);          // 3 × 1640
+  // La production découle du productible du gouvernorat : on la recalcule
+  // plutôt que de la figer, pour que l'affiner ne casse pas ce test.
+  assert.equal(e.production, Math.round(3 * productible('sfax')));
   assert.equal(e.prixKwh, 0.25);
   assert.ok(e.economieAnnuelle > 0);
   assert.ok(e.cout > 0);
@@ -181,4 +183,68 @@ test('une toiture contraignante ne fait jamais dépasser sa capacité', () => {
 test('sans contrainte de toiture, l\'arrondi reste au plus proche', () => {
   // 4800 kWh à Sfax donnent 2,93 kWc : sans toit contraignant, 3,0 est juste.
   assert.equal(puissanceRecommandee(FOYER), 3);
+});
+
+/* ------------------------------------------------------------------ */
+/* L'orientation du toit                                               */
+/* ------------------------------------------------------------------ */
+
+test('un toit mal orienté produit moins, à puissance égale', () => {
+  const sud = etudier({ ...FOYER, puissance: 3, orientation: 'sud', pente: 'moyenne' });
+  const nord = etudier({ ...FOYER, puissance: 3, orientation: 'nord', pente: 'moyenne' });
+  assert.ok(nord.production < sud.production * 0.6,
+    `plein nord : ${nord.production} kWh contre ${sud.production} au sud`);
+});
+
+test('un toit mal orienté demande plus de puissance pour le même besoin', () => {
+  // L'ignorer sous-dimensionnerait l'installation sans que personne ne s'en
+  // aperçoive avant la première facture.
+  const sud = puissanceRecommandee({ ...FOYER, orientation: 'sud', pente: 'moyenne' });
+  const est = puissanceRecommandee({ ...FOYER, orientation: 'est', pente: 'moyenne' });
+  assert.ok(est > sud, `est : ${est} kWc, sud : ${sud} kWc`);
+});
+
+test('sans orientation renseignée, rien n\'est pénalisé', () => {
+  // Le visiteur n'a pas encore répondu : supposer le pire l'écarterait à tort.
+  const e = etudier(FOYER);
+  assert.equal(e.facteurOrientation, 1);
+  assert.equal(e.production, Math.round(3 * productible('sfax')));
+});
+
+test('une terrasse ne subit pas l\'orientation du bâtiment', () => {
+  const a = etudier({ ...FOYER, puissance: 3, orientation: 'nord', pente: 'plat' });
+  const b = etudier({ ...FOYER, puissance: 3, orientation: 'sud', pente: 'plat' });
+  assert.equal(a.production, b.production);
+});
+
+/* ------------------------------------------------------------------ */
+/* La production mois par mois                                         */
+/* ------------------------------------------------------------------ */
+
+test('les douze mois somment à la production annuelle', () => {
+  const e = etudier(FOYER);
+  assert.equal(e.mensuel.length, 12);
+  const somme = e.mensuel.reduce((a, b) => a + b, 0);
+  // Les arrondis mensuels tolèrent quelques kWh d'écart, pas davantage.
+  assert.ok(Math.abs(somme - e.production) <= 12,
+    `somme ${somme} contre production ${e.production}`);
+});
+
+test('l\'été produit plus que l\'hiver, sans que l\'hiver soit nul', () => {
+  // Un client croit souvent que l'hiver ne donne rien : la courbe le rassure.
+  const e = etudier(FOYER);
+  const juillet = e.mensuel[6];
+  const decembre = e.mensuel[11];
+  assert.ok(juillet > decembre, 'juillet doit dépasser décembre');
+  assert.ok(decembre > juillet * 0.35,
+    `décembre ne produit que ${Math.round((decembre / juillet) * 100)} % de juillet`);
+});
+
+test('le sud a un profil plus régulier que le nord', () => {
+  const creux = (g) => {
+    const e = etudier({ ...FOYER, gouvernorat: g, puissance: 3 });
+    return Math.min(...e.mensuel) / Math.max(...e.mensuel);
+  };
+  assert.ok(creux('tozeur') > creux('bizerte'),
+    'le sud doit varier moins entre été et hiver');
 });

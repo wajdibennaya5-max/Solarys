@@ -10,7 +10,8 @@
  * Une étude bâtie sur ses chiffres à lui, il la reconnaît. Une étude bâtie sur
  * une moyenne nationale, il la conteste.
  */
-import { productible } from './gisement.js';
+import { productible, productionMensuelle } from './gisement.js';
+import { facteurOrientation } from './orientation.js';
 
 /**
  * HYPOTHÈSES ÉCONOMIQUES — à vérifier avant toute mise en ligne, et à revoir
@@ -57,12 +58,20 @@ export function prixDuKwh({ consommationAnnuelle, montantAnnuel }) {
  * le prix du surplus, bien inférieur. Le dimensionnement s'arrête donc là où
  * il cesse d'être rentable, et non là où il serait le plus gros.
  */
-export function puissanceRecommandee({ consommationAnnuelle, gouvernorat, surfaceDisponible }) {
+export function puissanceRecommandee({
+  consommationAnnuelle, gouvernorat, surfaceDisponible, orientation, pente,
+}) {
   const rendement = productible(gouvernorat);
   const kwh = Number(consommationAnnuelle);
   if (!rendement || !(kwh > 0)) return null;
 
-  let kwc = kwh / rendement;
+  // Un toit mal orienté produit moins par kilowatt : il en faut davantage
+  // pour couvrir le même besoin. L'ignorer sous-dimensionnerait l'installation
+  // sans que personne ne s'en aperçoive avant la première facture.
+  const f = facteurOrientation(orientation, pente);
+  const effectif = rendement * (f ? f.facteur : 1);
+
+  let kwc = kwh / effectif;
 
   // La toiture disponible peut brider le projet avant l'économie.
   if (surfaceDisponible > 0) {
@@ -87,15 +96,19 @@ export function puissanceRecommandee({ consommationAnnuelle, gouvernorat, surfac
  */
 export function etudier({
   consommationAnnuelle, montantAnnuel, gouvernorat, surfaceDisponible = 0,
-  puissance = null, hypotheses = HYPOTHESES,
+  puissance = null, orientation = null, pente = null, hypotheses = HYPOTHESES,
 }) {
   const prixKwh = prixDuKwh({ consommationAnnuelle, montantAnnuel });
   const rendement = productible(gouvernorat);
   const kwc = puissance ?? puissanceRecommandee({
-    consommationAnnuelle, gouvernorat, surfaceDisponible });
+    consommationAnnuelle, gouvernorat, surfaceDisponible, orientation, pente });
   if (!prixKwh || !rendement || !kwc) return null;
 
-  const production = kwc * rendement;
+  // Sans orientation renseignée, on ne pénalise pas : le visiteur n'a pas
+  // encore répondu, et supposer le pire l'écarterait à tort.
+  const f = facteurOrientation(orientation, pente);
+  const facteur = f ? f.facteur : 1;
+  const production = kwc * rendement * facteur;
   const consommation = Number(consommationAnnuelle);
 
   // Ce qui est consommé directement vaut le prix d'achat ; le reste est
@@ -128,6 +141,10 @@ export function etudier({
     puissance: kwc,
     production: Math.round(production),
     productible: rendement,
+    /** Ce que l'orientation retranche, ou 1 quand elle n'est pas connue. */
+    facteurOrientation: facteur,
+    /** Production mois par mois : un client veut savoir ce que donne décembre. */
+    mensuel: productionMensuelle(Math.round(production), gouvernorat),
     prixKwh,
     consommation,
     couverture: Math.min(1, production / consommation),

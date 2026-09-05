@@ -39,7 +39,7 @@ export const CONTACT = {
 export const API = 'https://20122011.xyz/api/etude';
 
 /** Les chiffres transmis au serveur : ceux que le visiteur a sous les yeux. */
-export function chiffresEtude(etude, toiture) {
+export function chiffresEtude(etude, toiture, toit) {
   return {
     consommation: etude.consommation,
     prixKwh: Number(etude.prixKwh.toFixed(4)),
@@ -55,6 +55,11 @@ export function chiffresEtude(etude, toiture) {
     ...(toiture?.L && toiture?.P
       ? { toiture: { largeur: toiture.L, profondeur: toiture.P } }
       : {}),
+    // L'orientation pèse davantage que tout le reste : le vendeur doit
+    // l'avoir avant de chiffrer, pas la découvrir sur place.
+    ...(toit?.orientation && toit?.pente
+      ? { toit: { orientation: toit.orientation, pente: toit.pente } }
+      : {}),
   };
 }
 
@@ -62,7 +67,7 @@ export function chiffresEtude(etude, toiture) {
  * Envoie la demande au serveur.
  * @returns {Promise<{ok:true, reference:string}|{ok:false, message:string}>}
  */
-export async function envoyerAuServeur({ client, etude, toiture, gouvernorat }) {
+export async function envoyerAuServeur({ client, etude, toiture, toit, gouvernorat }) {
   if (!API) return { ok: false, message: 'Aucun serveur configuré.' };
   try {
     const r = await fetch(API, {
@@ -73,7 +78,7 @@ export async function envoyerAuServeur({ client, etude, toiture, gouvernorat }) 
         phone: client.telephone,
         email: client.courriel || '',
         area: gouvernorat || '',
-        etude: chiffresEtude(etude, toiture),
+        etude: chiffresEtude(etude, toiture, toit),
       }),
     });
     const corps = await r.json().catch(() => ({}));
