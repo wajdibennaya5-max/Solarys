@@ -70,6 +70,53 @@ export const TYPES = [
 
 export const typeBatiment = (id) => TYPES.find((t) => t.id === id) ?? null;
 
+/**
+ * COMMENT LA CONSOMMATION SE RÉPARTIT DANS L'ANNÉE.
+ *
+ * Un total annuel ne dit pas si le besoin tombe quand le soleil donne. Sans
+ * cette courbe, on ne peut pas montrer au client le mois où il produira plus
+ * qu'il ne consomme — ce qui est justement le mois où il faut lui expliquer
+ * le surplus.
+ *
+ * Les douze coefficients totalisent 12 : chacun est un multiple du mois
+ * moyen. Ils décrivent des saisonnalités tunisiennes typiques, à recaler sur
+ * de vrais relevés. Quand le visiteur donne ses douze mois, ce sont les siens
+ * qui servent — ceci n'est que le recours par défaut.
+ */
+export const PROFILS_MENSUELS = {
+  /** Climatisation l'été, chauffage d'appoint l'hiver, creux au printemps. */
+  residentiel: [0.95, 0.88, 0.85, 0.82, 0.88, 1.05, 1.30, 1.32, 1.10, 0.90, 0.90, 1.05],
+  /** Ouvert toute l'année : la saison pèse peu, la climatisation un peu. */
+  tertiaire: [1.00, 0.98, 0.98, 0.97, 1.00, 1.05, 1.10, 1.05, 1.00, 0.96, 0.95, 0.96],
+  /** Les machines tournent sans saison ; seul le froid d'été ajoute un peu. */
+  industriel: [1.00, 0.99, 0.99, 0.98, 1.00, 1.04, 1.08, 1.05, 1.00, 0.97, 0.95, 0.95],
+  /** Le pompage suit l'irrigation : presque rien en novembre, tout en juillet. */
+  agricole: [0.70, 0.70, 0.85, 1.00, 1.20, 1.40, 1.60, 1.55, 1.20, 0.95, 0.45, 0.40],
+};
+
+/**
+ * La consommation mois par mois d'un bâtiment.
+ *
+ * @param {number} consommationAnnuelle kWh sur l'année
+ * @param {string} id type de bâtiment
+ * @param {Array<number>} [releves] les douze mois réellement saisis, s'ils existent
+ * @returns {Array<number>|null} douze valeurs en kWh
+ */
+export function consommationMensuelle(consommationAnnuelle, id, releves = null) {
+  const total = Number(consommationAnnuelle);
+  if (!(total > 0)) return null;
+
+  // Les relevés du client priment toujours sur un profil moyen : ce sont ses
+  // chiffres, et il les reconnaît.
+  const vrais = Array.isArray(releves)
+    ? releves.map(Number).filter((v) => Number.isFinite(v) && v >= 0) : [];
+  if (vrais.length === 12) return vrais.map((v) => Math.round(v));
+
+  const profil = PROFILS_MENSUELS[(typeBatiment(id) ?? typeBatiment(TYPE_DEFAUT)).profil]
+    ?? PROFILS_MENSUELS.residentiel;
+  return profil.map((c) => Math.round((total * c) / 12));
+}
+
 /** Le type retenu par défaut, quand la question n'a pas encore été posée. */
 export const TYPE_DEFAUT = 'maison';
 

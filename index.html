@@ -305,7 +305,112 @@ input:focus-visible,select:focus-visible{outline:none;border-color:var(--argile)
 .geo svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;
   stroke-linecap:round;stroke-linejoin:round}
 
-.resultat{max-width:820px;margin:0 auto}
+.resultat{max-width:900px;margin:0 auto}
+
+/* ── Tableau de bord ─────────────────────────────────────────────── */
+.dash-tete{text-align:center;margin-bottom:26px}
+.dash-sur{font-size:12.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--argile)}
+.dash-titre{font-family:var(--titre);font-size:30px;font-weight:800;color:var(--nuit);
+  margin-top:6px;line-height:1.15}
+.dash-haut{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px}
+@media(min-width:760px){.dash-haut{grid-template-columns:1.05fr 1fr}}
+
+/* La carte centrale : la réponse, et rien autour. */
+.socle{background:linear-gradient(155deg,var(--nuit) 0%,var(--nuit-3) 100%);
+  border-radius:var(--rayon);padding:32px 26px;text-align:center;color:#fff;
+  display:flex;flex-direction:column;justify-content:center;min-height:200px;
+  box-shadow:0 14px 40px rgba(6,40,46,.22)}
+.socle-sur{font-size:11.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--or)}
+.socle-val{font-family:var(--titre);font-size:clamp(46px,13vw,66px);font-weight:800;
+  line-height:1;margin:12px 0 10px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.socle-unite{font-size:.42em;font-weight:700;color:var(--or-pale);letter-spacing:0;
+  margin-left:4px}
+.socle-sous{font-size:14px;color:rgba(255,255,255,.72);line-height:1.5}
+
+/* Le Solar Score. */
+.score{background:var(--surface);border:1px solid var(--bord);border-radius:var(--rayon);
+  padding:22px;display:flex;gap:18px;align-items:flex-start}
+.score-anneau{position:relative;flex:none;width:110px;height:110px}
+.score-anneau svg{width:110px;height:110px;display:block}
+.score-note{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;line-height:1}
+.score-note b{font-family:var(--titre);font-size:30px;font-weight:800;color:var(--nuit)}
+.score-note span{font-size:11px;color:var(--encre-3);margin-top:3px}
+.score-texte{flex:1;min-width:0}
+.score-titre{font-size:11.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--argile)}
+.score-phrase{font-size:15.5px;font-weight:700;color:var(--nuit);margin-top:6px;line-height:1.4}
+.score-avert{font-size:12.5px;color:#8a5a1c;background:#fdf1e4;border-radius:8px;
+  padding:7px 10px;margin-top:9px;line-height:1.45}
+.score-detail{margin-top:11px}
+.score-detail summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--encre-2);
+  list-style:none}
+.score-detail summary::-webkit-details-marker{display:none}
+.score-detail summary::before{content:'+ ';color:var(--argile);font-weight:800}
+.score-detail[open] summary::before{content:'– '}
+.bloc .score-detail dl,.score-detail dl{display:block;margin-top:10px;font-size:13px}
+.score-detail dl>div{border-top:1px solid var(--bord);padding:8px 0;display:grid;
+  grid-template-columns:1fr auto}
+.score-detail dt{color:var(--encre-2);font-weight:700}
+.score-detail dt i{font-style:normal;font-weight:600;color:var(--encre-3);font-size:11.5px}
+.score-detail dd{margin:0;font-weight:800;color:var(--nuit);text-align:right}
+.score-detail dl p{grid-column:1/-1;font-size:12px;color:var(--encre-3);margin-top:3px}
+.score-detail .manque dd{color:var(--encre-3);font-weight:600}
+.score-preliminaire .score-anneau svg circle:last-child{opacity:.6}
+
+/* Les cinq chiffres qui font la décision. */
+.kpis{display:grid;gap:12px;grid-template-columns:repeat(2,1fr)}
+@media(min-width:700px){.kpis{grid-template-columns:repeat(5,1fr)}}
+.kpi{background:var(--surface);border:1px solid var(--bord);border-radius:15px;
+  padding:16px 15px;display:flex;flex-direction:column;gap:5px}
+.kpi-ic{width:19px;height:19px;fill:none;stroke:var(--argile);stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round;margin-bottom:2px}
+.kpi-lib{font-size:11.5px;font-weight:700;color:var(--encre-3);line-height:1.3}
+.kpi-val{font-family:var(--titre);font-size:25px;font-weight:800;color:var(--nuit);
+  line-height:1.05;font-variant-numeric:tabular-nums}
+.kpi-val i{font-style:normal;font-size:13px;font-weight:700;color:var(--encre-3)}
+.kpi-note{font-size:11.5px;color:var(--encre-3);line-height:1.4;margin-top:1px}
+.kpi.fort{background:var(--nuit);border-color:var(--nuit)}
+.kpi.fort .kpi-ic{stroke:var(--or)}
+.kpi.fort .kpi-lib,.kpi.fort .kpi-note{color:rgba(255,255,255,.68)}
+.kpi.fort .kpi-val{color:#fff}
+.kpi.fort .kpi-val i{color:var(--or)}
+.dash-co2{margin:16px 0 4px;text-align:center;font-size:13.5px;color:var(--encre-2);
+  line-height:1.55}
+
+/* Le diagramme de flux, plus large que haut : il défile plutôt qu'il ne rétrécit. */
+.graphe-flux{overflow-x:auto}
+.graphe-flux svg{min-width:520px}
+.fx-boite{fill:var(--surface);stroke:var(--bord);stroke-width:1.5}
+.fx-boite.fx-soleil{fill:#fdf3e2;stroke:var(--or)}
+.fx-boite.fx-maison{fill:var(--nuit);stroke:var(--nuit)}
+.fx-boite.fx-reseau{fill:var(--douce);stroke:var(--repere)}
+.fx-titre{font-family:var(--titre);font-size:13.5px;font-weight:800;fill:var(--nuit)}
+.fx-val{font-family:var(--texte);font-size:12px;font-weight:700;fill:var(--encre-2)}
+.fx-titre.fx-clair{fill:#fff}
+.fx-val.fx-clair-doux{fill:rgba(255,255,255,.72)}
+.fx-note-achat{fill:var(--argile)}
+/* Les pointes de flèche : la couleur passe par une règle CSS, car un
+   attribut de présentation SVG n'accepte pas var(). */
+.fx-tete-or{fill:var(--or)}
+.fx-tete-gris{fill:var(--repere)}
+.fx-tete-rouge{fill:var(--argile)}
+.fx-trait{stroke:var(--or);fill:none;stroke-linecap:round;color:var(--or)}
+.fx-trait.fx-vers-reseau{stroke:var(--repere);color:var(--repere)}
+.fx-trait.fx-achat{stroke:var(--argile);color:var(--argile);stroke-dasharray:6 5}
+.fx-note{font-family:var(--texte);font-size:11.5px;font-weight:700;fill:var(--encre-2)}
+
+/* Le squelette de chargement. */
+.squelette{display:flex;flex-direction:column;gap:10px;padding:6px 0}
+.squelette span{height:13px;border-radius:7px;
+  background:linear-gradient(90deg,var(--grille) 25%,var(--douce) 37%,var(--grille) 63%);
+  background-size:400% 100%;animation:squel 1.3s ease infinite}
+@keyframes squel{0%{background-position:100% 50%}100%{background-position:0 50%}}
+@media(prefers-reduced-motion:reduce){.squelette span{animation:none}
+  .sauvegarde.vif{animation:none}}
+
 .chiffres{display:grid;gap:14px;grid-template-columns:repeat(2,1fr);margin:28px 0}
 @media(min-width:660px){.chiffres{grid-template-columns:repeat(4,1fr)}}
 .chiffre{background:var(--surface);border:1px solid var(--bord);border-radius:15px;

@@ -16,10 +16,15 @@ import { PERIODES, REPERES } from './facture.js';
 import { METHODES, FIABILITES, resoudre, verifier as verifierConso, methode }
   from './consommation.js';
 import { QUESTIONS } from './profil.js';
-import { TYPES, typeBatiment, TYPE_DEFAUT } from './batiment.js';
+import { TYPES, typeBatiment, TYPE_DEFAUT, consommationMensuelle } from './batiment.js';
 import { MODULES, MODULE_DEFAUT, moduleParId } from './materiel.js';
 import { POSES, optimiser } from './calepinage.js';
-import { construireGraphe, grapheMensuel } from './graphe.js';
+import { carteCentrale, grilleKpi, carteScore, avertissement, phraseCo2 }
+  from './tableau.js';
+import { evaluer } from './score.js';
+import { animerChiffres } from './anime.js';
+import { construireGraphe, grapheMensuel, grapheComparaison, diagrammeFlux }
+  from './graphe.js';
 import { OFFRE, CONTACT, ouverte, redigerDemande, lienDemande, champsManquants,
   envoyerAuServeur, API } from './prospect.js';
 import { enregistrer, relire, effacer, ageEnClair } from './session.js';
@@ -932,7 +937,7 @@ function dessinerScenarios() {
 
 function dessinerResultat() {
   const toit = cotesToit();
-  simulation = { puissance: null, surface: (toit.L || 0) * (toit.P || 0) };
+  simulation = { puissance: null, surface: (toit.L || 0) * (toit.P || 0), sienne: false };
   const e = etudeCourante();
 
   // Une étude incomplète ne s'affiche pas à moitié.
@@ -943,20 +948,42 @@ function dessinerResultat() {
   simulation.puissance = e.puissance;
 
   $('resultat').innerHTML = `
-    <h3 style="text-align:center;font-size:27px;margin-bottom:9px" id="titreRes"></h3>
-    <p class="sous-titre" style="margin-bottom:0" id="sousRes"></p>
-    <p class="fiabilite" id="fiabilite" hidden></p>
+    <div class="dash-tete">
+      <p class="dash-sur" id="dashLieu"></p>
+      <h3 class="dash-titre" id="titreRes"></h3>
+      <p class="fiabilite" id="fiabilite" hidden></p>
+    </div>
 
-    <div class="chiffres" id="chiffres"></div>
+    <div class="dash-haut">
+      <div id="socle"></div>
+      <div id="scoreSolaire"></div>
+    </div>
+
+    <div id="kpis"></div>
+    <p class="dash-co2" id="phraseCo2"></p>
 
     <div class="bloc" id="blocScenarios">
       <h4>Trois façons de dimensionner votre toiture</h4>
       <p class="note">Le même toit, le même soleil, la même facture : seule la
-        taille change. Le plus petit se rembourse le plus vite, le plus grand
-        rapporte le plus sur vingt-cinq ans. Touchez celui qui vous ressemble —
-        tout le reste de la page suit.</p>
+        taille change. Touchez celle qui vous ressemble — tout le reste de la
+        page suit. Les hypothèses sont les mêmes pour les trois, et sont
+        rappelées en bas de page.</p>
       <div class="scenarios" id="scenarios"></div>
       <p class="indice" id="noteScenarios" role="status" style="margin-top:14px"></p>
+    </div>
+
+    <div class="bloc">
+      <h4>Où va votre énergie</h4>
+      <p class="note">Le soleil frappe les panneaux, l’onduleur transforme, et
+        ce que vous ne consommez pas au moment où il est produit part sur le
+        réseau. L’épaisseur des flèches suit les kilowattheures.</p>
+      <div class="graphe graphe-flux" id="flux"></div>
+    </div>
+
+    <div class="bloc" id="blocComparaison">
+      <h4>Est-ce que ça couvre ?</h4>
+      <p class="note" id="noteComparaison"></p>
+      <div class="graphe" id="grapheComparaison"></div>
     </div>
 
     <div class="bloc">
@@ -970,7 +997,7 @@ function dessinerResultat() {
     <div class="bloc">
       <h4>Ajustez, et regardez ce que ça change</h4>
       <p class="note">Rien n’est figé : votre toiture, votre budget, vos envies.
-        Les chiffres et la courbe suivent.</p>
+        Les chiffres et les courbes suivent.</p>
       <div class="curseurs">
         <div class="curseur">
           <div class="tete"><span>Puissance installée</span><b id="vPuissance"></b></div>
@@ -1000,10 +1027,7 @@ function dessinerResultat() {
     <div class="bloc">
       <h4>Le détail</h4>
       <dl id="detail"></dl>
-      <p class="avert"><b>Cette estimation ne remplace pas une visite.</b> Elle ne
-        voit ni l’orientation exacte de votre toit, ni l’ombre du bâtiment voisin,
-        ni l’état de votre tableau électrique. Les coûts retenus sont des ordres
-        de grandeur du marché tunisien, non un devis.</p>
+      <div id="avertissement"></div>
     </div>
 
     <div class="offre">
@@ -1028,6 +1052,10 @@ function dessinerResultat() {
 
   cP.addEventListener('input', () => {
     simulation.puissance = Number(cP.value);
+    // Dès que le visiteur déplace le curseur, ce n'est plus notre
+    // recommandation : la carte centrale le dit plutôt que de s'attribuer
+    // un chiffre qu'elle n'a pas proposé.
+    simulation.sienne = true;
     rafraichir();
   });
 
@@ -1037,6 +1065,7 @@ function dessinerResultat() {
     const carte = ev.target.closest('[data-kwc]');
     if (!carte) return;
     simulation.puissance = Number(carte.dataset.kwc);
+    simulation.sienne = false;
     // Le curseur peut ne pas atteindre le scénario Performance sur une petite
     // installation : on élargit plutôt que d'ignorer le clic.
     if (simulation.puissance > Number(cP.max)) cP.max = simulation.puissance;
@@ -1060,6 +1089,10 @@ function dessinerResultat() {
   });
 
   rafraichir();
+  // Les compteurs ne montent qu'une fois, à la première ouverture du tableau
+  // de bord : les relancer à chaque déplacement de curseur rendrait les
+  // chiffres illisibles pendant qu'on les compare.
+  animerChiffres($('resultat'));
   dessinerDemande(e);
   $('form').hidden = true;
   // La barre reste : « 06 Résultats » s'allume, et les étapes franchies
@@ -1083,26 +1116,24 @@ function rafraichir() {
   const e = etudeCourante();
   if (!e) return;
   const lieu = nomGouvernorat(reponses.gouvernorat);
-  const couverture = Math.round(e.couverture * 100);
+  const bat = typeBatiment(e.batiment);
+  const source = donneesEtude();
 
-  $('titreRes').textContent = `Votre installation : ${
-    String(e.puissance).replace('.', ',')} kWc`;
-  $('sousRes').textContent = `À ${lieu}, ${e.modules} modules sur environ `
-    + `${e.surface} m² couvriraient ${couverture} % de votre consommation.`;
+  $('dashLieu').textContent = `${bat ? bat.nom : 'Bâtiment'} à ${lieu}`;
+  $('titreRes').textContent = 'Votre étude photovoltaïque';
 
-  $('chiffres').innerHTML = [
-    [formaterRond(e.economieMensuelle), 'économie / mois', true],
-    [e.retour ? String(e.retour.toFixed(1)).replace('.', ',') + ' ans' : 'au-delà de 25 ans',
-      'retour sur investissement', false],
-    [formaterRond(e.cout), 'coût estimé', false],
-    [formaterRond(e.gainNet), 'gain net sur 25 ans', false],
-  ].map(([v, l, fort]) => `<div class="chiffre${fort ? ' fort' : ''}">
-    <span class="v">${v}</span><span class="l">${l}</span></div>`).join('');
+  // La carte centrale, puis les cinq chiffres qui font la décision. Le titre
+  // dit « recommandée » tant que le visiteur n'a pas déplacé le curseur :
+  // au-delà, ce n'est plus notre recommandation, c'est son choix.
+  const surMesure = simulation.sienne === true;
+  $('socle').innerHTML = carteCentrale(e, {
+    titre: surMesure ? 'Puissance choisie' : 'Puissance recommandée' });
+  $('kpis').innerHTML = grilleKpi(e);
+  $('phraseCo2').textContent = phraseCo2(e);
 
   // D'où vient le chiffre de départ, dit avant tous les autres chiffres.
   // Une estimation présentée comme une certitude se retourne contre nous à
   // la première facture du client.
-  const source = donneesEtude();
   const f = source && FIABILITES[source.fiabilite];
   $('fiabilite').hidden = !f;
   if (f) {
@@ -1110,7 +1141,43 @@ function rafraichir() {
     $('fiabilite').innerHTML = `<b>${f.nom}</b> — ${f.phrase}`;
   }
 
+  // Le Solar Score, sur les seules données réellement disponibles.
+  const pan = reponses.toit ?? {};
+  $('scoreSolaire').innerHTML = carteScore(evaluer({
+    gouvernorat: reponses.gouvernorat,
+    orientation: pan.orientation ?? null,
+    pente: pan.pente ?? null,
+    surfaceDisponible: simulation.surface,
+    puissanceVisee: e.puissance,
+    tauxAutoconsommation: e.tauxAutoconsommation,
+    retour: e.retour,
+  }));
+
+  $('flux').innerHTML = diagrammeFlux(e, { largeur: 620, hauteur: 260 }) ?? '';
   $('graphe').innerHTML = construireGraphe(e, { largeur: 620, hauteur: 250 }).svg;
+
+  // Production contre consommation : la seule question que tout le monde
+  // pose, et à laquelle un total annuel ne répond pas.
+  const relevesMois = source?.mois ?? null;
+  const conso = consommationMensuelle(e.consommation, e.batiment, relevesMois);
+  const comparaison = (e.mensuel && conso)
+    ? grapheComparaison(e.mensuel, conso, MOIS, { largeur: 620, hauteur: 230 }) : null;
+  $('blocComparaison').hidden = !comparaison;
+  if (comparaison) {
+    $('grapheComparaison').innerHTML = comparaison;
+    const couverts = e.mensuel.filter((p, i) => p >= conso[i]).length;
+    $('noteComparaison').textContent = couverts === 12
+      ? 'Votre production dépasse votre consommation tous les mois de l’année : '
+        + 'le surplus part sur le réseau, au prix de rachat.'
+      : couverts === 0
+        ? 'Votre production reste sous votre consommation toute l’année : tout ce '
+          + 'qui est produit est consommé sur place, rien n’est revendu.'
+        : `Votre production couvre entièrement ${couverts} mois sur 12. Les autres `
+          + 'mois, la STEG complète — et votre facture baisse sans disparaître.'
+      + (relevesMois ? ' Comparaison faite sur vos douze mois réels.'
+        : ' La répartition de votre consommation dans l’année est un profil type, '
+          + 'pas un relevé.');
+  }
 
   dessinerScenarios();
 
@@ -1149,6 +1216,8 @@ function rafraichir() {
       + `${c.orientation} — soit ${String(c.puissance).replace('.', ',')} kWc au maximum, `
       + `en ${reglage.module.nom}. Marges de rive et jeux entre modules compris.`;
   }
+
+  $('avertissement').innerHTML = avertissement(e, HYPOTHESES);
 
   $('detail').innerHTML = [
     ...(source?.detailConso ? [['D’où vient votre consommation', source.detailConso]] : []),
