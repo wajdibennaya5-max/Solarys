@@ -16,6 +16,7 @@ import { PERIODES, REPERES, versAnnuel, verifier as verifierFacture } from './fa
 import { construireGraphe, grapheMensuel } from './graphe.js';
 import { OFFRE, CONTACT, ouverte, redigerDemande, lienDemande, champsManquants,
   envoyerAuServeur, API } from './prospect.js';
+import { enregistrer, relire, effacer, ageEnClair } from './session.js';
 
 const $ = (id) => document.getElementById(id);
 const reponses = {};
@@ -177,6 +178,87 @@ const ETAPES = [
 ];
 
 let etape = 0;
+
+/* ------------------------------------------------------------------ */
+/* Reprise                                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Range où en est le visiteur, après chaque étape validée.
+ *
+ * Un appel, un SMS, un onglet tué par Android : le parcours s'interrompt pour
+ * mille raisons qui n'ont rien à voir avec l'envie de continuer. Sans cela, il
+ * faudrait tout ressaisir — et personne ne ressaisit.
+ */
+function memoriser(fini = false) {
+  enregistrer({ etape, fini, reponses });
+}
+
+/** Les clés qu'une simulation peut légitimement contenir. */
+const CLES = ETAPES.map((e) => e.cle);
+
+/**
+ * Ne garde d'un état relu que ce que la version actuelle sait afficher.
+ *
+ * Le stockage survit aux mises en ligne : une simulation d'hier peut porter
+ * une clé qui n'existe plus, ou manquer d'une clé nouvelle. Filtrer ici évite
+ * qu'un ancien format ne casse la page à l'ouverture.
+ */
+function reponsesRetenues(brutes) {
+  const propres = {};
+  if (!brutes || typeof brutes !== 'object') return propres;
+  for (const cle of CLES) {
+    if (brutes[cle] !== undefined && brutes[cle] !== null) propres[cle] = brutes[cle];
+  }
+  return propres;
+}
+
+/**
+ * Propose de reprendre — sans jamais l'imposer.
+ *
+ * Restaurer d'office serait déroutant : le visiteur qui revient exprès pour
+ * refaire un calcul avec d'autres chiffres verrait les anciens revenir seuls.
+ * On montre ce qui est en mémoire, il choisit.
+ */
+function proposerReprise() {
+  const banniere = $('reprise');
+  if (!banniere) return;
+  const memoire = relire();
+  if (!memoire) return;
+
+  const gardees = reponsesRetenues(memoire.etat?.reponses);
+  const combien = Object.keys(gardees).length;
+  if (!combien) { effacer(); return; }
+
+  const fini = memoire.etat?.fini === true && combien === CLES.length;
+  banniere.hidden = false;
+  banniere.innerHTML = `<p class="reprise-txt"><b>Vous avez commencé une étude</b>
+    ${ageEnClair(memoire.age)}${fini ? ' — elle est terminée.'
+      : ` : ${combien} réponse${combien > 1 ? 's' : ''} sur ${CLES.length}.`}</p>
+    <div class="reprise-actes">
+      <button class="btn primaire" type="button" id="reprendre">${
+        fini ? 'Revoir mon étude' : 'Reprendre'}</button>
+      <button class="btn" type="button" id="oublier">Recommencer</button>
+    </div>`;
+
+  $('reprendre').addEventListener('click', () => {
+    Object.assign(reponses, gardees);
+    banniere.hidden = true;
+    if (fini) { dessinerResultat(); return; }
+    // Jamais plus loin que ce qui est réellement rempli : une étape reprise
+    // sur des réponses manquantes afficherait un écran vide.
+    const rempli = CLES.findIndex((c) => gardees[c] === undefined);
+    const vise = Number.isInteger(memoire.etat?.etape) ? memoire.etat.etape : 0;
+    etape = Math.max(0, Math.min(vise, rempli === -1 ? CLES.length - 1 : rempli));
+    dessinerEtape();
+    $('tunnel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  $('oublier').addEventListener('click', () => {
+    effacer();
+    banniere.hidden = true;
+  });
+}
 
 /* ------------------------------------------------------------------ */
 /* Affichage                                                           */
@@ -555,6 +637,9 @@ function dessinerDemande(etude) {
           redigerDemande({ etude, client, gouvernorat: lieu, payante: false }))}"
           target="_blank" rel="noopener">Nous écrire sur WhatsApp</a></p>
       </div>`;
+      // La demande est partie : garder la simulation n'apporterait plus rien,
+      // et proposer de « reprendre » après coup serait confus.
+      effacer();
       return;
     }
 
@@ -578,8 +663,8 @@ $('form').addEventListener('submit', (ev) => {
   if (souci) { $('erreur').textContent = souci; return; }
 
   reponses[e.cle] = valeur;
-  if (etape < ETAPES.length - 1) { etape++; dessinerEtape(); }
-  else dessinerResultat();
+  if (etape < ETAPES.length - 1) { etape++; memoriser(); dessinerEtape(); }
+  else { memoriser(true); dessinerResultat(); }
 });
 
 $('retour').addEventListener('click', () => {
@@ -588,3 +673,4 @@ $('retour').addEventListener('click', () => {
 
 $('annee').textContent = new Date().getFullYear();
 dessinerEtape();
+proposerReprise();
