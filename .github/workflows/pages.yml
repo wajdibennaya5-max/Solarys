@@ -49,9 +49,14 @@ jobs:
           # Tout le dépôt est publiable, sauf l'outillage de développement.
           # Les tests et l'outillage de développement ne se publient pas :
           # le site n'en a pas besoin, et les servir ne ferait qu'alourdir.
+          # `docs/` reste au dépôt et ne part pas en ligne : ce sont des
+          # documents de développement, et SECURITE.md nomme ce qui n'est pas
+          # encore protégé. La transparence due au visiteur est ailleurs — le
+          # site affiche lui-même ses hypothèses et la provenance de chaque
+          # chiffre.
           rsync -a --exclude '/_site' --exclude '.git' --exclude '.github' \
                    --exclude 'tests' --exclude 'package.json' \
-                   --exclude 'node_modules' \
+                   --exclude 'node_modules' --exclude 'docs' \
                    ./ _site/
           touch _site/.nojekyll
           echo "Contenu publié :"
