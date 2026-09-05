@@ -22,7 +22,8 @@ import { POSES, optimiser } from './calepinage.js';
 import { carteCentrale, grilleKpi, carteScore, avertissement, phraseCo2 }
   from './tableau.js';
 import { evaluer } from './score.js';
-import { animerChiffres } from './anime.js';
+import { animerChiffres, compter, mouvementReduit } from './anime.js';
+import { tousLesCas, DUREE as DUREE_VITRE } from './heros.js';
 import { construireGraphe, grapheMensuel, grapheComparaison, diagrammeFlux }
   from './graphe.js';
 import { OFFRE, CONTACT, ouverte, redigerDemande, lienDemande, champsManquants,
@@ -1345,6 +1346,98 @@ $('form').addEventListener('submit', (ev) => {
 $('retour').addEventListener('click', () => {
   if (etape > 0) { etape--; dessinerEtape(); }
 });
+
+/* ------------------------------------------------------------------ */
+/* L'accueil                                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * LA VITRE DE L'ACCUEIL — trois cas réellement calculés, qui défilent.
+ *
+ * Aucun de ces chiffres n'est écrit à la main : ils sortent du même moteur
+ * que l'étude du visiteur. C'est ce qui autorise à les afficher avant qu'il
+ * ait rien saisi — on ne lui promet rien, on lui montre la machine qui
+ * tourne.
+ */
+function brancherVitre() {
+  const vitre = $('vitre');
+  if (!vitre) return;
+  const cas = tousLesCas();
+  if (!cas.length) { vitre.hidden = true; return; }
+
+  let index = 0;
+  let minuterie = null;
+
+  $('vitrePoints').innerHTML = cas.map((c, i) => `<button type="button"
+    data-cas="${i}" aria-current="${i === 0}"
+    aria-label="Voir l’exemple : ${c.intitule}"></button>`).join('');
+
+  const peindre = (anime = true) => {
+    const c = cas[index];
+    $('vitreTitre').textContent = c.intitule;
+    $('vitreDetail').textContent = `${c.detail} — installation de ${
+      String(c.puissance).replace('.', ',')} kWc`;
+    $('vitreChiffres').innerHTML = c.chiffres.map((x) => `<div class="vitre-c${
+      x.fort ? ' fort' : ''}">
+      <span class="l">${x.libelle}</span>
+      <span class="v" data-vitre="${x.cle}">0</span><span class="u">${x.unite}</span>
+    </div>`).join('');
+
+    for (const x of c.chiffres) {
+      const noeud = $('vitreChiffres').querySelector(`[data-vitre="${x.cle}"]`);
+      compter(noeud, x.valeur, {
+        duree: anime ? 800 : 0,
+        format: (v) => v.toLocaleString('fr-FR', {
+          minimumFractionDigits: x.decimales, maximumFractionDigits: x.decimales }),
+      });
+    }
+
+    for (const point of $('vitrePoints').querySelectorAll('[data-cas]')) {
+      point.setAttribute('aria-current', String(Number(point.dataset.cas) === index));
+    }
+    if (anime && !mouvementReduit()) {
+      vitre.classList.remove('change');
+      void vitre.offsetWidth;
+      vitre.classList.add('change');
+    }
+  };
+
+  const relancer = () => {
+    clearInterval(minuterie);
+    // Le mouvement réduit arrête le défilement, il ne le ralentit pas : une
+    // carte qui change toute seule est exactement ce que ce réglage refuse.
+    if (mouvementReduit()) return;
+    minuterie = setInterval(() => {
+      index = (index + 1) % cas.length;
+      peindre();
+    }, DUREE_VITRE);
+  };
+
+  $('vitrePoints').addEventListener('click', (ev) => {
+    const point = ev.target.closest('[data-cas]');
+    if (!point) return;
+    index = Number(point.dataset.cas);
+    peindre();
+    relancer();
+  });
+
+  // Un visiteur qui lit une carte ne doit pas la voir partir sous ses yeux.
+  vitre.addEventListener('mouseenter', () => clearInterval(minuterie));
+  vitre.addEventListener('mouseleave', relancer);
+  vitre.addEventListener('focusin', () => clearInterval(minuterie));
+
+  // Rien ne tourne pendant que l'onglet est ailleurs : c'est du calcul et du
+  // rendu pour personne, et sur mobile c'est de la batterie.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) clearInterval(minuterie);
+    else relancer();
+  });
+
+  peindre(false);
+  relancer();
+}
+
+brancherVitre();
 
 $('annee').textContent = new Date().getFullYear();
 dessinerEtape();
