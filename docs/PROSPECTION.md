@@ -71,6 +71,32 @@ ils travaillent.
 - Les salons et journées techniques du secteur : un stand vu de loin donne
   une liste d'exposants directement exploitable.
 
+**Marchés anglophones**
+
+L'interface anglaise est complète — 363 clés sur 364, la seule absente étant
+le nom du produit. Et les villes de référence couvrent déjà **Lagos, Dakar,
+Abidjan, Bamako, Niamey, Douala, Nouakchott, Riyad, Dubaï et Montréal** : ces
+marchés sont servis nativement, sans que le client ait à saisir ses propres
+données de gisement.
+
+- **Nigeria d'abord, puis Ghana et Kenya.** La cible anglophone la plus
+  forte, devant le Royaume-Uni. Le réseau y est incertain : le fonctionnement
+  hors ligne cesse d'y être un confort pour devenir une condition, et PVsyst
+  à 700 CHF est simplement hors sujet. Commencez par le Nigeria — **Lagos
+  figure dans les villes de référence**, Accra et Nairobi non ; pour le Ghana
+  et le Kenya, annoncez d'emblée que les données mensuelles se saisissent,
+  plutôt que de laisser le prospect le découvrir seul. Cherchez sur LinkedIn
+  et dans les groupes WhatsApp professionnels, très actifs.
+- **Golfe (Émirats, Arabie saoudite, Qatar).** Bureaux d'études qui rendent
+  des dossiers normalisés, budgets confortables, et l'anglais comme langue de
+  travail — avec l'arabe en renfort. Visez l'abonnement, pas la licence à 20 €.
+- **Inde, Pakistan, Bangladesh.** Volume considérable et forte sensibilité au
+  prix : la licence perpétuelle est faite pour eux. En revanche leurs villes
+  ne figurent pas dans les références ; dites-le, et rappelez que les données
+  mensuelles sont modifiables.
+- **Royaume-Uni, Irlande.** Meilleure tolérance au prix, mais concurrence
+  installée et exigences de certification propres. À garder pour plus tard.
+
 **Partout**
 - Les questions sur les forums et groupes techniques : quelqu'un qui demande
   « comment calculer la section entre les modules et l'onduleur » vient de
@@ -169,6 +195,75 @@ répondre les gens : il rend le refus facile, donc gratuit.
 > https://wajdibennaya5-max.github.io/Solarys/app/
 >
 > Je peux lever le filigrane pour un usage pédagogique si cela vous est utile.
+
+### F. Premier contact — anglais, courriel
+
+> **Subject:** the single-line diagram, without AutoCAD
+>
+> Hello {First name},
+>
+> I build a PV sizing tool, and I'm looking for feedback from people who
+> actually have to deliver the paperwork.
+>
+> Every tool calculates yield. What interests me is what comes after it: the
+> single-line diagram, the cable sizing, the protection ratings, the title
+> block. Solarys draws those sheets automatically, straight from the design.
+>
+> Nothing to install, no account: https://wajdibennaya5-max.github.io/Solarys/app/
+>
+> Does the documentation cost you as much time as it costs the people I've
+> been talking to?
+>
+> {Your name}
+
+### G. Premier contact — anglais, message court
+
+> Hi {First name} — I build a tool that generates the single-line diagram,
+> cable sizes and protection ratings straight from a PV design, so the
+> drawings don't have to be redone in AutoCAD on every job.
+>
+> It's open, no sign-up: https://wajdibennaya5-max.github.io/Solarys/app/
+>
+> How long does the documentation take you today?
+
+Même règle qu'en français : joignez `captures/planche-schema-unifilaire.png`.
+
+Pour l'Afrique de l'Ouest et l'Afrique de l'Est, ajoutez la ligne qui compte
+le plus là-bas — et qui est vraie :
+
+> It runs fully offline once loaded, on a phone too. Lagos, Dakar, Abidjan
+> and Douala are already in the reference sites.
+
+### H. Relance en anglais — une seule fois
+
+> Hello {First name}, just floating this back up in case it got buried. If
+> it's not your area, tell me and I won't push — and if you know someone the
+> documentation side makes suffer, I'll gladly take a name.
+>
+> {Your name}
+
+### I. Écoles et formation — anglais
+
+> Hello {First name},
+>
+> Solarys is a PV sizing tool that runs entirely in the browser: no install,
+> no per-seat licence, no account to create. A whole class can open it at
+> once, on phones, with no network.
+>
+> It shows the full chain — resource, layout, strings, cabling, protections,
+> single-line diagram, financial study — which is where free tools stop.
+>
+> Free, with a watermark on the drawings:
+> https://wajdibennaya5-max.github.io/Solarys/app/
+>
+> I can lift the watermark for teaching use if that helps.
+
+**Un mot sur le prix en anglais.** Vos tarifs sont en euros. Vers le Nigeria,
+l'Inde ou le Pakistan, annoncez l'équivalent approximatif en devise locale
+dans la conversation — 20 €, converti, est une somme que l'interlocuteur
+évalue instantanément, alors qu'un montant en euros demande un calcul et
+introduit un doute. Ne modifiez pas la vitrine pour autant : une seule grille
+affichée, des équivalents donnés de vive voix.
 
 ## 5. Les trois objections que vous entendrez
 
