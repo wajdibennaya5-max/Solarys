@@ -9,7 +9,10 @@
  * ne peut être téléversé nulle part sans serveur, mais il se joint en deux
  * gestes à la conversation qui vient de s'ouvrir.
  */
-import { formater, formaterRond } from './prix.js';
+import { formaterRond } from './prix.js';
+
+/** En français, la décimale est une virgule. Un « 7.4 » trahit le copier-coller. */
+const virgule = (x) => String(x).replace('.', ',');
 
 /**
  * OÙ ARRIVENT LES DEMANDES — à renseigner pour ouvrir l'activité.
@@ -17,9 +20,9 @@ import { formater, formaterRond } from './prix.js';
  * que par une décision explicite de leur propriétaire.
  */
 export const CONTACT = {
-  nom: '',
-  whatsapp: '',
-  courriel: '',
+  nom: 'Solarys',
+  whatsapp: '21654062596',
+  courriel: 'wajdibennaya5@gmail.com',
 };
 
 /**
@@ -66,14 +69,16 @@ export function redigerDemande({ etude, client, gouvernorat, payante = true }) {
     `Gouvernorat : ${gouvernorat || '—'}`,
     '',
     'Mon estimation en ligne :',
-    `• Consommation : ${etude.consommation} kWh/an`,
-    `• Prix payé : ${etude.prixKwh.toFixed(3)} DT/kWh`,
-    `• Puissance conseillée : ${etude.puissance} kWc (${etude.modules} modules, ${etude.surface} m²)`,
-    `• Production estimée : ${etude.production} kWh/an`,
-    `• Économie estimée : ${formater(etude.economieAnnuelle)} par an`,
-    `• Coût estimé : ${formater(etude.cout)}`,
+    `• Consommation : ${etude.consommation.toLocaleString('fr-FR')} kWh/an`,
+    `• Prix payé : ${virgule(etude.prixKwh.toFixed(3))} DT/kWh`,
+    `• Puissance conseillée : ${virgule(etude.puissance)} kWc (${etude.modules} modules, ${etude.surface} m²)`,
+    `• Production estimée : ${etude.production.toLocaleString('fr-FR')} kWh/an`,
+    // Une estimation ne se donne pas au millime près : la fausse précision
+    // se retourne contre celui qui l'affiche.
+    `• Économie estimée : ${formaterRond(etude.economieAnnuelle)} par an`,
+    `• Coût estimé : ${formaterRond(etude.cout)}`,
     etude.retour
-      ? `• Retour sur investissement : ${etude.retour.toFixed(1)} ans`
+      ? `• Retour sur investissement : ${virgule(etude.retour.toFixed(1))} ans`
       : '• Retour sur investissement : au-delà de 25 ans',
     '',
     'Je joins la photo de ma facture STEG à ce message.',

@@ -15,9 +15,12 @@ const CLIENT = { nom: 'Amine Ben Salah', telephone: '20123456' };
 test('la demande porte l\'étude entière, pour chiffrer sans rappeler', () => {
   const t = redigerDemande({ etude: ETUDE, client: CLIENT, gouvernorat: 'Sfax' });
   for (const attendu of ['Amine Ben Salah', '20123456', 'Sfax',
-    '4800 kWh/an', '3 kWc', '4920 kWh/an', '0.250 DT/kWh']) {
+    '3 kWc', '6 modules', '18 m²', '0,250 DT/kWh']) {
     assert.ok(t.includes(attendu), `manquant dans la demande : ${attendu}`);
   }
+  // Milliers séparés par une espace fine insécable (U+202F).
+  assert.match(t, /4\u202f800 kWh\/an/);
+  assert.match(t, /4\u202f920 kWh\/an/);
 });
 
 test('la demande payante annonce son prix, sans millimes trompeurs', () => {
@@ -83,4 +86,17 @@ test('la demande survit aux caractères à échapper', () => {
     assert.match(decodeURIComponent(new URL(lien).searchParams.get('text')),
       /Ben « Ali » & Fils #2/);
   } finally { Object.assign(CONTACT, initial); }
+});
+
+test('la demande s\'écrit en français, sans point décimal ni fausse précision', () => {
+  // « 0.250 » et « 7.4 » trahissent le copier-coller ; « 9 000,000 DT » se lit
+  // neuf millions. Un professionnel tunisien le remarque avant le reste.
+  const t = redigerDemande({ etude: ETUDE, client: CLIENT, gouvernorat: 'Sfax' });
+  const chiffres = t.split('\n').filter((l) => l.startsWith('•'));
+  for (const ligne of chiffres) {
+    assert.doesNotMatch(ligne, /\d\.\d/, `point décimal anglais dans : ${ligne}`);
+  }
+  assert.match(t, /0,250 DT\/kWh/);
+  assert.match(t, /7,4 ans/);
+  assert.doesNotMatch(t, /,000 DT/, 'aucun montant estimé au millime près');
 });

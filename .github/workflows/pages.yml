@@ -1,11 +1,9 @@
 # Publie le site sur GitHub Pages.
 #
-# Le dépôt EST le site :
-#   /       la vitrine commerciale
-#   /app/   l'application Solarys
+# Le dépôt EST le site : une page, ses modules dans /js/.
 #
-# La publication n'a lieu que si les tests du moteur de calcul passent : un
-# outil de dimensionnement faux est pire qu'un outil indisponible.
+# La publication n'a lieu que si les tests passent : une étude fausse est pire
+# qu'un site indisponible — celui qui la paie s'en apercevra sur sa facture.
 
 name: Publier le site
 
@@ -33,7 +31,6 @@ jobs:
         with:
           node-version: '22'
       - name: Exécuter les tests
-        working-directory: app
         run: npm test
 
   publier:
@@ -50,14 +47,11 @@ jobs:
         run: |
           mkdir -p _site
           # Tout le dépôt est publiable, sauf l'outillage de développement.
-          # `tools/` est l'outillage du vendeur, pas du site : il n'a rien à
-          # faire sur la vitrine. Cela ne change rien au modèle de sécurité —
-          # `makeKey` est de toute façon livré dans app/js/licence.js, qui le
-          # dit lui-même : la licence est une commodité, pas une protection.
+          # Les tests et l'outillage de développement ne se publient pas :
+          # le site n'en a pas besoin, et les servir ne ferait qu'alourdir.
           rsync -a --exclude '/_site' --exclude '.git' --exclude '.github' \
-                   --exclude 'app/tests' --exclude 'app/package.json' \
-                   --exclude 'app/node_modules' --exclude 'app/README.md' \
-                   --exclude 'tools' --exclude 'docs' \
+                   --exclude 'tests' --exclude 'package.json' \
+                   --exclude 'node_modules' \
                    ./ _site/
           touch _site/.nojekyll
           echo "Contenu publié :"

@@ -1,93 +1,68 @@
 # Solarys
 
-Outil de dimensionnement de centrales photovoltaïques : calepinage réel des
-modules, dossier d'exécution, dimensionnement électrique et étude économique.
+Étude photovoltaïque gratuite pour les foyers tunisiens.
 
 **Le site :** https://wajdibennaya5-max.github.io/Solarys/
-**L'application :** https://wajdibennaya5-max.github.io/Solarys/app/
 
-Tout fonctionne dans le navigateur. Aucun compte, aucun serveur : les projets
-restent sur le poste de l'utilisateur et s'exportent en fichier. Une fois la page
-chargée, l'application s'installe et fonctionne hors ligne.
+Quatre questions, toutes tirées de la facture STEG, et le visiteur sait ce que
+le solaire lui ferait économiser : puissance à installer, production, économie
+mensuelle, temps de retour. Gratuit, immédiat, sans compte.
 
-## Ce qu'elle fait
+## Le parti pris
 
-| Section | Contenu |
-|---|---|
-| **Site & gisement** | 34 villes de référence, inclinaison optimale calculée, données mensuelles modifiables |
-| **Consommation** | Facture annuelle, relevé mensuel ou liste d'équipements |
-| **Calepinage** | Surfaces, obstacles, marges de rive, placement des modules aux dimensions réelles, entraxe des rangées |
-| **Champ PV** | Longueur de chaîne, compatibilité MPPT, ratio DC/AC, pertes détaillées |
-| **Stockage** | Autonomie, profondeur de décharge, association série/parallèle, régulateur |
-| **Câblage** | Sections par chute de tension et courant admissible, fusibles, disjoncteurs, parafoudres |
-| **Production** | Productible mensuel, ratio de performance, cascade des pertes |
-| **Économie** | Nomenclature chiffrée, flux de trésorerie, VAN, TRI, temps de retour, LCOE, CO₂ |
-| **Dossier d'exécution** | Planches A4 à A1 : page de garde, schéma unifilaire, câbles et protections |
-| **Rapport** | Document imprimable en marque blanche |
+**On ne devine pas le tarif STEG.** Il est progressif, il dépend du contrat, et
+un tarif supposé fausserait toute l'économie du projet. On demande donc la
+consommation *et* le montant payés — tous deux écrits sur la facture — et on en
+déduit le prix réel du kilowattheure.
 
-Interface en français, anglais et arabe, avec écriture de droite à gauche.
+Une étude bâtie sur ses chiffres, le client la reconnaît. Une étude bâtie sur
+une moyenne nationale, il la conteste.
 
-## Méthode de calcul
+## Ce que le site ne fait pas
 
-- **Gisement** — profil horaire reconstitué sur le jour moyen du mois (jours de
-  Klein), décomposition direct/diffus par la corrélation d'Erbs, transposition
-  sur plan incliné par HDKR. Gère n'importe quelle orientation.
-- **Calepinage** — géométrie réelle : contour de la surface, marge de rive,
-  obstacles avec leur dégagement, orientation la plus dense. Sur structures
-  inclinées, l'entraxe suit la règle de non-ombrage au solstice d'hiver, et
-  l'ombrage résiduel entre rangées est calculé géométriquement.
-- **Chaînes** — tension à vide à la température minimale du site contre la
-  limite continue de l'onduleur, tension MPP à chaud contre la plage MPPT
-  (logique IEC 62548 / UTE C 15-712-1).
-- **Câbles** — plus contraignant du courant admissible (IEC 60364-5-52,
-  méthode E, corrections de température et de groupement) et de la chute de
-  tension. Le critère dimensionnant est affiché.
-- **Économie** — flux annuels avec dégradation, inflation et remplacements ;
-  VAN, TRI par dichotomie, temps de retour simple et actualisé, LCOE.
+- Il ne voit ni l'orientation exacte du toit, ni l'ombre du bâtiment voisin,
+  ni l'état du tableau électrique. L'estimation le dit à l'écran.
+- Il n'affiche aucun témoignage ni compteur de clients : il n'y en a pas encore,
+  et les inventer coûterait plus cher que le silence.
+- Il n'a ni serveur ni base de données. Les réponses restent dans le navigateur
+  du visiteur jusqu'à ce qu'il écrive lui-même sur WhatsApp.
 
-Ordres de grandeur contrôlés par les tests : Tunis 36,8 °N à 31° →
-1 640 kWh/kWc et un ratio de performance de 0,81 ; Paris → 1 050 kWh/kWc.
+## Structure
+
+```
+index.html          la page, entière
+js/gisement.js      productible par zone, les 24 gouvernorats
+js/etude.js         dimensionnement, production, économie, temps de retour
+js/prix.js          le dinar en millimes, mise en forme tunisienne
+js/prospect.js      la demande WhatsApp, et l'offre payante
+js/site.js          le tunnel en quatre étapes et l'affichage du résultat
+tests/              28 tests
+```
+
+## Le modèle
+
+L'estimation en ligne est gratuite et le restera : c'est elle qui donne envie.
+Ce qui se paie, c'est l'**étude détaillée** — le dossier qu'un installateur
+accepte comme base de devis. Son prix et son contenu se règlent dans
+`js/prospect.js`, tout comme le numéro WhatsApp qui reçoit les demandes.
 
 ## Démarrer localement
 
 ```bash
-cd app
 npm start   # http://localhost:8080
-npm test    # 139 tests : moteur de calcul, traductions, boutique et licences
+npm test    # 28 tests
 ```
 
-Aucune dépendance, aucune étape de construction : ce sont des modules
-JavaScript natifs servis tels quels.
+Aucune dépendance, aucune étape de construction : des modules JavaScript natifs
+servis tels quels.
 
-## Vendre
+## Hypothèses à revoir
 
-Les trois formules et l'encaissement se configurent en un seul endroit,
-`app/js/boutique.js` — la vitrine et l'application le lisent toutes les deux.
-Tant qu'aucun moyen n'y est renseigné, les formules s'affichent sans se
-vendre, plutôt que de mener à une page morte.
+`js/etude.js` regroupe dans `HYPOTHESES` les seuls nombres qui ne viennent pas
+du client — coût au kWc, part autoconsommée, valeur du surplus, hausse du prix
+de l'électricité. Ce sont eux qui vieillissent : à vérifier chaque année.
 
-Une fois un règlement reçu, la clé s'émet en une commande :
+---
 
-```bash
-node tools/cle.mjs "jean@bureau-etudes.fr"
-node tools/cle.mjs "commande-2026-014" --formule credits --dossiers 5
-```
-
-L'outil affiche la clé et le message à renvoyer au client. La chaîne complète
-— commande, règlement, émission, activation — est décrite dans
-[`docs/VENDRE.md`](docs/VENDRE.md), et la recherche des premiers clients dans
-[`docs/PROSPECTION.md`](docs/PROSPECTION.md).
-
-## Limites assumées
-
-- Les composants livrés sont des **archétypes génériques**, pas des copies de
-  fiches techniques de fabricants : une caractéristique recopiée devient fausse
-  à la révision suivante du produit, et un dimensionnement faux engage
-  l'installateur.
-- Les données de gisement sont **indicatives**, destinées à l'avant-projet. Une
-  étude d'exécution demande les données du site réel (PVGIS, NASA POWER,
-  Meteonorm ou station locale).
-- Le taux d'autoconsommation est estimé par corrélation, faute de courbe de
-  charge horaire.
-- **Les résultats sont indicatifs.** Toute installation doit être validée par un
-  professionnel qualifié au regard des normes applicables sur son marché.
+L'ancien produit — dimensionnement professionnel, dossier d'exécution, boutique
+et paiement USDT — reste entier sur la branche `solarys-v1`.

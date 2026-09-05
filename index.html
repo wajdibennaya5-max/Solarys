@@ -1,495 +1,420 @@
 <!doctype html>
-<html lang="fr" dir="ltr">
+<html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Solarys — du besoin en kWh au dossier d'exécution</title>
-<meta name="description" content="Logiciel de dimensionnement photovoltaïque qui produit le dossier d'exécution complet : schéma unifilaire, sections de câbles, calibres de protections, nomenclature et étude économique. En français et en arabe.">
-<meta name="theme-color" content="#0b0e14">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Solarys — Étude photovoltaïque gratuite en Tunisie</title>
+<meta name="description" content="Estimez en deux minutes ce que le solaire vous ferait économiser, à partir de votre vraie facture STEG. Gratuit, sans compte, sans engagement.">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
-
-<meta property="og:type" content="website">
-<meta property="og:title" content="Solarys — dimensionnement photovoltaïque">
-<meta property="og:description" content="Du besoin en kWh au dossier d'exécution, en dix minutes. Schéma unifilaire, câbles, protections, nomenclature et étude économique.">
-<meta property="og:image" content="./captures/planche-schema-unifilaire.png">
-<meta name="twitter:card" content="summary_large_image">
-
 <style>
 :root{
-  --bg:#0b0e14; --surface:#11151d; --surface-2:#171c26; --border:#262e3d;
-  --text-1:#e8ecf3; --text-2:#a4aec0; --text-3:#6f7a8d;
-  --accent:#f5a524; --accent-ink:#1a1204; --accent-soft:#f5a52418;
-  --good:#199e70; --bad:#e66767;
+  --marine:#0b2c4a; --marine-fonce:#07203a; --marine-clair:#14406a;
+  --ambre:#f9c846; --ambre-fonce:#e0ac1f; --ambre-encre:#3a2c05;
+  --creme:#f4f1ea; --blanc:#fff;
+  --texte:#0b2c4a; --texte-doux:#5b6b7c; --texte-pale:#8797a8;
+  --bord:#e3e0d8; --bon:#128a5e; --alerte:#c0492f;
   --font:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans Arabic',sans-serif;
-  --wrap:1120px;
+  --large:1120px; --rayon:16px; --ombre:0 1px 3px rgba(11,44,74,.06),0 8px 28px rgba(11,44,74,.07);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;font-family:var(--font);background:var(--bg);color:var(--text-1);
-  font-size:16px;line-height:1.62;-webkit-font-smoothing:antialiased}
-h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.022em;line-height:1.18}
-p{margin:0}
-a{color:inherit}
+body{margin:0;font-family:var(--font);color:var(--texte);background:var(--blanc);
+  line-height:1.6;-webkit-font-smoothing:antialiased}
 img{max-width:100%;height:auto;display:block}
-.wrap{max-width:var(--wrap);margin:0 auto;padding:0 22px}
-.eyebrow{font-size:12px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.wrap{max-width:var(--large);margin:0 auto;padding:0 20px}
+h1,h2,h3{letter-spacing:-.025em;line-height:1.15;margin:0}
+h1{font-size:clamp(30px,7vw,54px);font-weight:800}
+h2{font-size:clamp(25px,5vw,38px);font-weight:800}
+h3{font-size:19px;font-weight:700}
+p{margin:0}
 
-/* ---------- barre ---------- */
-.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);
-  background:color-mix(in srgb,var(--bg) 84%,transparent);border-bottom:1px solid var(--border)}
-.nav .wrap{display:flex;align-items:center;gap:14px;height:62px}
-.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:700;letter-spacing:-.02em}
-.brand img{width:26px;height:26px}
-.nav-links{margin-left:auto;display:flex;gap:24px;align-items:center;font-size:14px}
-.nav-links a{color:var(--text-2);text-decoration:none}
-.nav-links a:hover{color:var(--text-1)}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
-  padding:11px 20px;border-radius:10px;border:1px solid var(--border);
-  background:var(--surface-2);color:var(--text-1);text-decoration:none;
-  font-size:15px;font-weight:600;cursor:pointer;transition:.15s}
-.btn:hover{background:#1e2532;border-color:#3a4459}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.btn.primary:hover{filter:brightness(1.08)}
-.btn.sm{padding:8px 15px;font-size:14px}
+/* ── En-tête ─────────────────────────────────────────── */
+header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.94);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--bord)}
+.bar{display:flex;align-items:center;gap:14px;height:66px}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--marine)}
+.logo svg{width:34px;height:34px;flex:none}
+.logo b{font-size:18px;font-weight:800;letter-spacing:-.02em;line-height:1}
+.logo span{display:block;font-size:10.5px;font-weight:600;letter-spacing:.16em;
+  color:var(--texte-pale);text-transform:uppercase}
+.bar nav{margin-left:auto;display:flex;gap:26px;align-items:center;font-size:14.5px}
+.bar nav a{color:var(--texte-doux);text-decoration:none;font-weight:500}
+.bar nav a:hover{color:var(--marine)}
+@media(max-width:820px){.bar nav a:not(.btn){display:none}}
 
-/* ---------- héros ---------- */
-.hero{padding:64px 0 60px;position:relative;overflow:hidden}
-.hero::before{content:'';position:absolute;inset:-40% 30% auto -10%;height:560px;
-  background:radial-gradient(closest-side,#f5a52415,transparent);pointer-events:none}
-.hero-grid{display:grid;gap:44px;grid-template-columns:1.05fr .95fr;align-items:center;position:relative}
-h1{font-size:clamp(34px,5vw,52px)}
-.hero p.lead{margin-top:20px;font-size:19px;color:var(--text-2);max-width:34em}
-.hero-cta{margin-top:30px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
-.hero-note{margin-top:14px;font-size:13.5px;color:var(--text-3)}
-.shot{border:1px solid var(--border);border-radius:14px;overflow:hidden;
-  background:#fff;box-shadow:0 24px 60px -30px #000c}
-.shot.dark{background:var(--surface)}
-/* Une planche technique comporte beaucoup de blanc : dans le héros on n'en
-   montre que la partie dense, pour ne pas repousser le titre sous la ligne
-   de flottaison. */
-.hero .shot img{width:100%;height:auto;aspect-ratio:2.3/1;
-  object-fit:cover;object-position:top center}
+/* ── Boutons ─────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  padding:14px 26px;border-radius:999px;border:1.5px solid transparent;
+  font:inherit;font-weight:700;font-size:15.5px;text-decoration:none;
+  cursor:pointer;background:var(--blanc);color:var(--marine);
+  border-color:var(--bord);transition:transform .12s ease,box-shadow .12s ease}
+.btn:hover{transform:translateY(-1px)}
+.btn:focus-visible{outline:3px solid var(--ambre);outline-offset:2px}
+.btn.primaire{background:var(--ambre);color:var(--ambre-encre);border-color:var(--ambre);
+  box-shadow:0 4px 16px rgba(249,200,70,.34)}
+.btn.primaire:hover{background:var(--ambre-fonce);border-color:var(--ambre-fonce)}
+.btn.fantome{background:transparent;color:var(--blanc);border-color:rgba(255,255,255,.42)}
+.btn.fantome:hover{background:rgba(255,255,255,.1)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn.large{padding:17px 34px;font-size:17px;width:100%}
+@media(min-width:560px){.btn.large{width:auto}}
 
-/* ---------- bandes ---------- */
-section{padding:72px 0;border-top:1px solid var(--border)}
-/* La barre collante ne doit pas recouvrir le titre visé par une ancre. */
-section[id],[id]{scroll-margin-top:80px}
-.section-head{max-width:44em;margin-bottom:36px}
-.section-head h2{font-size:clamp(25px,3.2vw,34px);margin-top:10px}
-.section-head p{margin-top:14px;color:var(--text-2);font-size:17px}
+/* ── Héros ───────────────────────────────────────────── */
+.heros{background:linear-gradient(160deg,var(--marine) 0%,var(--marine-fonce) 100%);
+  color:var(--blanc);position:relative;padding:64px 0 92px;text-align:center;overflow:hidden}
+.heros::after{content:'';position:absolute;inset:auto 0 -1px 0;height:52px;
+  background:var(--blanc);
+  -webkit-mask:radial-gradient(120% 100% at 50% 100%,#000 61%,transparent 62%);
+  mask:radial-gradient(120% 100% at 50% 100%,#000 61%,transparent 62%)}
+.heros h1{max-width:14ch;margin:0 auto;text-wrap:balance}
+.heros .accroche{margin:20px auto 0;max-width:46ch;font-size:17.5px;
+  color:rgba(255,255,255,.82)}
+.heros .btn{margin-top:32px}
+.preuves{display:flex;flex-direction:column;gap:12px;align-items:center;
+  margin:38px auto 0;font-size:14.5px;color:rgba(255,255,255,.8)}
+.preuves div{display:flex;align-items:center;gap:10px}
+.preuves svg{width:19px;height:19px;flex:none;stroke:var(--ambre);
+  fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+@media(min-width:760px){.preuves{flex-direction:row;justify-content:center;gap:34px}}
 
-.split{display:grid;gap:40px;grid-template-columns:1fr 1fr;align-items:center}
-.split.reverse>:first-child{order:2}
+/* ── Sections ────────────────────────────────────────── */
+section{padding:76px 0}
+section.creme{background:var(--creme)}
+.titre-section{text-align:center;max-width:30ch;margin:0 auto 12px}
+.sous-titre{text-align:center;max-width:52ch;margin:0 auto 46px;color:var(--texte-doux);font-size:16.5px}
 
-.cards{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(255px,1fr))}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px}
-.card h3{font-size:17px;margin-bottom:8px}
-.card p{color:var(--text-2);font-size:14.5px}
-.card .ico{width:34px;height:34px;border-radius:9px;background:var(--accent-soft);
-  display:grid;place-items:center;margin-bottom:14px;color:var(--accent)}
-.card .ico svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;
-  stroke-linecap:round;stroke-linejoin:round}
+.grille{display:grid;gap:20px}
+@media(min-width:720px){.grille.trois{grid-template-columns:repeat(3,1fr)}}
 
-/* ---------- comparatif ---------- */
-.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:14px}
-table{width:100%;border-collapse:collapse;font-size:14.5px;min-width:660px}
-th,td{padding:13px 16px;text-align:left;border-bottom:1px solid var(--border)}
-thead th{background:var(--surface-2);font-size:12.5px;color:var(--text-2);
-  text-transform:uppercase;letter-spacing:.05em;font-weight:650}
-tbody tr:last-child td{border-bottom:0}
-td.c{text-align:center}
-.yes{color:var(--good);font-weight:700}
-.no{color:var(--bad)}
-.mine{background:var(--accent-soft)}
-tbody th{font-weight:550;color:var(--text-1)}
+.carte{background:var(--blanc);border:1px solid var(--bord);border-radius:var(--rayon);
+  padding:28px 24px;box-shadow:var(--ombre)}
+.carte .ico{width:52px;height:52px;border-radius:14px;background:var(--marine);
+  display:grid;place-items:center;margin-bottom:16px}
+.carte .ico svg{width:25px;height:25px;stroke:var(--ambre);fill:none;
+  stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.carte p{margin-top:9px;color:var(--texte-doux);font-size:15px}
 
-/* ---------- tarifs ---------- */
-.plans{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(236px,1fr));align-items:start}
-.plan{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:26px;
-  display:flex;flex-direction:column;gap:16px;height:100%}
-.plan.featured{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 20px 50px -34px #f5a52466}
-.plan .tag{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-  color:var(--accent)}
-.price{font-size:38px;font-weight:700;letter-spacing:-.03em;line-height:1}
-.price small{font-size:15px;font-weight:500;color:var(--text-3);letter-spacing:0}
-.plan ul{list-style:none;margin:0;padding:0;display:grid;gap:9px;font-size:14.5px;color:var(--text-2)}
-.plan li{display:flex;gap:9px;align-items:flex-start}
-.plan li::before{content:'✓';color:var(--good);font-weight:700;flex:none}
-.plan li.off{color:var(--text-3)}
-.plan li.off::before{content:'—';color:var(--text-3)}
-.plan .btn{margin-top:auto;width:100%}
+.etape{text-align:center}
+.etape .rond{width:64px;height:64px;border-radius:18px;background:var(--creme);
+  display:grid;place-items:center;margin:0 auto 16px;position:relative}
+section.creme .etape .rond{background:var(--blanc)}
+.etape .rond svg{width:28px;height:28px;stroke:var(--marine);fill:none;
+  stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.etape .num{position:absolute;top:-11px;left:50%;transform:translateX(-50%);
+  width:26px;height:26px;border-radius:50%;background:var(--ambre);
+  color:var(--ambre-encre);font-size:13px;font-weight:800;display:grid;place-items:center}
+.etape p{margin-top:8px;color:var(--texte-doux);font-size:15px}
 
-/* ---------- faq ---------- */
-details{border:1px solid var(--border);border-radius:12px;background:var(--surface);
-  padding:16px 20px;margin-bottom:10px}
-details[open]{background:var(--surface-2)}
-summary{cursor:pointer;font-weight:600;font-size:16px;list-style:none;
-  display:flex;justify-content:space-between;gap:14px;align-items:center}
-summary::-webkit-details-marker{display:none}
-summary::after{content:'+';color:var(--accent);font-size:20px;font-weight:400;flex:none}
-details[open] summary::after{content:'−'}
-details p{margin-top:12px;color:var(--text-2);font-size:15px}
+/* ── Tunnel ──────────────────────────────────────────── */
+#tunnel{scroll-margin-top:80px}
+.jauge{display:flex;align-items:center;justify-content:center;gap:0;margin:0 auto 34px;max-width:420px}
+.jauge .pas{display:flex;align-items:center;flex:1}
+.jauge .pas:last-child{flex:none}
+.jauge b{width:34px;height:34px;border-radius:50%;flex:none;display:grid;place-items:center;
+  font-size:14px;font-weight:700;background:var(--blanc);color:var(--texte-pale);
+  border:2px solid var(--bord)}
+.jauge .trait{height:2px;flex:1;background:var(--bord)}
+.jauge .pas.faite b{background:var(--marine);border-color:var(--marine);color:var(--blanc)}
+.jauge .pas.faite .trait{background:var(--marine)}
+.jauge .pas.active b{border-color:var(--marine);color:var(--marine);
+  box-shadow:0 0 0 4px rgba(11,44,74,.09)}
 
-/* ---------- pied ---------- */
-footer{border-top:1px solid var(--border);padding:44px 0 56px;color:var(--text-3);font-size:13.5px}
-footer .wrap{display:grid;gap:22px}
-footer a{color:var(--text-2)}
-.disclaimer{padding:16px 18px;border:1px solid var(--border);border-radius:12px;
-  background:var(--surface);border-left:3px solid var(--accent);color:var(--text-2);font-size:13.5px}
+.panneau{background:var(--blanc);border:1px solid var(--bord);border-radius:20px;
+  padding:32px 24px;box-shadow:var(--ombre);max-width:560px;margin:0 auto}
+.panneau h3{text-align:center;font-size:22px;margin-bottom:8px}
+.panneau .aide{text-align:center;color:var(--texte-doux);font-size:15px;margin-bottom:26px}
+label{display:block;font-size:14px;font-weight:600;margin-bottom:7px}
+input,select{width:100%;padding:14px 15px;font:inherit;font-size:16px;
+  border:1.5px solid var(--bord);border-radius:12px;background:var(--blanc);
+  color:var(--texte)}
+input:focus-visible,select:focus-visible{outline:none;border-color:var(--marine);
+  box-shadow:0 0 0 4px rgba(11,44,74,.09)}
+.champ+.champ{margin-top:18px}
+.indice{margin-top:7px;font-size:13.5px;color:var(--texte-pale)}
+.erreur{margin-top:10px;font-size:14px;color:var(--alerte);min-height:20px}
+.actions{display:flex;gap:12px;margin-top:26px}
+.actions .btn{flex:1}
+.repli{background:var(--creme);border-radius:12px;padding:14px 16px;margin-top:16px;
+  font-size:14px;color:var(--texte-doux)}
+.repli summary{cursor:pointer;font-weight:600;color:var(--marine);list-style:none}
+.repli summary::-webkit-details-marker{display:none}
+.repli summary::before{content:'? ';font-weight:800;color:var(--ambre-fonce)}
+.repli p{margin-top:10px}
 
-.cta-band{text-align:center}
-.cta-band h2{font-size:clamp(26px,3.4vw,36px)}
-.cta-band p{margin-top:14px;color:var(--text-2);font-size:17px}
-.cta-band .hero-cta{justify-content:center;margin-top:26px}
+/* ── Résultat ────────────────────────────────────────── */
+.resultat{max-width:760px;margin:0 auto}
+.chiffres{display:grid;gap:14px;grid-template-columns:repeat(2,1fr);margin:28px 0}
+@media(min-width:640px){.chiffres{grid-template-columns:repeat(4,1fr)}}
+.chiffre{background:var(--blanc);border:1px solid var(--bord);border-radius:14px;
+  padding:20px 16px;text-align:center;box-shadow:var(--ombre)}
+.chiffre .v{font-size:26px;font-weight:800;letter-spacing:-.03em;color:var(--marine);
+  line-height:1.1;display:block}
+.chiffre .l{font-size:12.5px;color:var(--texte-pale);margin-top:6px;display:block;
+  text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.chiffre.fort{background:var(--marine);border-color:var(--marine)}
+.chiffre.fort .v{color:var(--ambre)}
+.chiffre.fort .l{color:rgba(255,255,255,.62)}
+.detail{background:var(--blanc);border:1px solid var(--bord);border-radius:var(--rayon);
+  padding:24px;box-shadow:var(--ombre)}
+.detail dl{display:grid;grid-template-columns:1fr auto;gap:12px 18px;margin:0;font-size:15px}
+.detail dt{color:var(--texte-doux)}
+.detail dd{margin:0;font-weight:700;text-align:right}
+.avert{margin-top:20px;font-size:13.5px;color:var(--texte-pale);
+  border-top:1px solid var(--bord);padding-top:16px}
 
-@media(max-width:880px){
-  .hero-grid,.split{grid-template-columns:1fr}
-  .split.reverse>:first-child{order:0}
-  .nav-links a:not(.btn){display:none}
-  .hero{padding:52px 0 44px}
-  section{padding:56px 0}
-}
+/* ── Offre ───────────────────────────────────────────── */
+.offre{background:var(--marine);color:var(--blanc);border-radius:20px;
+  padding:34px 26px;margin-top:34px}
+.offre h3{font-size:24px;color:var(--blanc)}
+.offre .prix{font-size:42px;font-weight:800;letter-spacing:-.03em;color:var(--ambre);
+  margin:14px 0 4px}
+.offre ul{list-style:none;padding:0;margin:22px 0 0;display:grid;gap:12px}
+.offre li{display:flex;gap:11px;font-size:15px;color:rgba(255,255,255,.86)}
+.offre li svg{width:19px;height:19px;flex:none;margin-top:3px;stroke:var(--ambre);
+  fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.offre .btn{margin-top:26px}
+
+/* ── Repli FAQ ───────────────────────────────────────── */
+.faq{max-width:720px;margin:0 auto;display:grid;gap:12px}
+.faq details{background:var(--blanc);border:1px solid var(--bord);
+  border-radius:14px;padding:20px 22px;box-shadow:var(--ombre)}
+.faq summary{cursor:pointer;font-weight:700;font-size:16.5px;list-style:none;
+  display:flex;justify-content:space-between;gap:16px;align-items:center}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:'';width:11px;height:11px;flex:none;
+  border-right:2.4px solid var(--texte-pale);border-bottom:2.4px solid var(--texte-pale);
+  transform:rotate(45deg) translateY(-3px);transition:transform .2s}
+.faq details[open] summary::after{transform:rotate(225deg) translateY(-3px)}
+.faq p{margin-top:14px;color:var(--texte-doux);font-size:15.5px}
+
+/* ── Pied ────────────────────────────────────────────── */
+.appel{background:linear-gradient(160deg,var(--marine) 0%,var(--marine-fonce) 100%);
+  color:var(--blanc);text-align:center}
+.appel h2{color:var(--blanc)}
+.appel p{margin:16px auto 0;max-width:44ch;color:rgba(255,255,255,.78)}
+footer{background:var(--marine-fonce);color:rgba(255,255,255,.68);padding:52px 0 30px;font-size:14.5px}
+footer .logo{color:var(--blanc)}
+footer .logo span{color:rgba(255,255,255,.5)}
+footer .cols{display:grid;gap:34px;margin-top:26px}
+@media(min-width:720px){footer .cols{grid-template-columns:2fr 1fr 1fr}}
+footer h4{font-size:14px;color:var(--blanc);margin:0 0 14px;font-weight:700}
+footer ul{list-style:none;padding:0;margin:0;display:grid;gap:9px}
+footer a{color:rgba(255,255,255,.68);text-decoration:none}
+footer a:hover{color:var(--blanc)}
+footer .bas{margin-top:36px;padding-top:20px;border-top:1px solid rgba(255,255,255,.13);
+  font-size:13px;color:rgba(255,255,255,.45)}
+[hidden]{display:none!important}
 </style>
 </head>
 <body>
 
-<nav class="nav"><div class="wrap">
-  <a class="brand" href="#"><img src="./icon.svg" alt=""> Solarys</a>
-  <div class="nav-links">
-    <a href="#produit">Le produit</a>
-    <a href="#comparatif">Comparatif</a>
-    <a href="#tarifs">Tarifs</a>
-    <a class="btn primary sm" href="./app/">Ouvrir l'application</a>
+<header>
+  <div class="wrap bar">
+    <a class="logo" href="#haut">
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="1" y="20" width="5" height="6" rx="1" fill="#128a5e"/>
+        <rect x="8" y="15" width="5" height="11" rx="1" fill="#37a76b"/>
+        <rect x="15" y="10" width="5" height="16" rx="1" fill="#f9c846"/>
+        <rect x="22" y="4" width="5" height="22" rx="1" fill="#e0ac1f"/>
+        <rect x="1" y="28" width="26" height="2.4" rx="1.2" fill="currentColor"/>
+      </svg>
+      <span><b>SOLARYS</b><span>Énergie solaire</span></span>
+    </a>
+    <nav>
+      <a href="#marche">Comment ça marche</a>
+      <a href="#pourquoi">Pourquoi nous</a>
+      <a href="#questions">Questions</a>
+      <a class="btn primaire" href="#tunnel">Étude gratuite</a>
+    </nav>
   </div>
-</div></nav>
+</header>
 
-<header class="hero"><div class="wrap hero-grid">
-  <div>
-    <span class="eyebrow">Dimensionnement photovoltaïque</span>
-    <h1>Du besoin en kWh au dossier d'exécution, en dix minutes.</h1>
-    <p class="lead">
-      Solarys calcule le champ, vérifie les chaînes contre l'onduleur, détermine les
-      sections de câbles et les calibres de protections, puis édite les planches —
-      schéma unifilaire, tableaux, nomenclature — avec cadre et cartouche à révisions.
-      En français, en arabe, et hors ligne.
-    </p>
-    <div class="hero-cta">
-      <a class="btn primary" href="./app/">Essayer gratuitement</a>
-      <a class="btn" href="#produit">Voir une planche</a>
-    </div>
-    <p class="hero-note">Aucune installation, aucun compte. Vos projets restent dans votre navigateur.</p>
-  </div>
-  <div class="shot"><img src="./captures/planche-schema-unifilaire.png"
-    alt="Planche de schéma unifilaire générée par Solarys, avec cadre, cartouche à tableau de révisions et tableau de description générale de la centrale" loading="eager" width="2220" height="1584"></div>
-</div></header>
+<main id="haut">
 
-<section id="produit"><div class="wrap">
-  <div class="section-head">
-    <span class="eyebrow">Le problème</span>
-    <h2>Le calcul prend vingt minutes. Le dossier prend la journée.</h2>
-    <p>
-      Dimensionner une centrale n'est pas le plus long. Ce qui coûte, c'est le dossier
-      qu'il faut rendre derrière : redessiner le schéma unifilaire sous AutoCAD, retaper
-      les sections de câbles, recomposer le cartouche, refaire la nomenclature. À chaque
-      projet. Les outils gratuits ne le font pas ; les outils qui approchent coûtent
-      700 à 1 800 € par an et par poste.
-    </p>
-  </div>
-
-  <div class="cards">
-    <div class="card">
-      <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 8h4v8H4zM10 12h4M16 8h4v8h-4zM8 12h2"/></svg></div>
-      <h3>Le dossier d'exécution, automatique</h3>
-      <p>Planches A4 à A1 : cadre, cartouche avec tableau de révisions, tableau de
-        description générale de la centrale, folio. Export SVG, impression directe.</p>
-    </div>
-    <div class="card">
-      <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 6h6a4 4 0 0 1 4 4v4a4 4 0 0 0 4 4h2M4 6v12"/></svg></div>
-      <h3>L'ingénierie réellement calculée</h3>
-      <p>Sections retenues au plus contraignant du courant admissible et de la chute de
-        tension. Fusibles gPV bornés par la tenue inverse du module. Tension à vide à
-        froid vérifiée contre la limite de l'onduleur.</p>
-    </div>
-    <div class="card">
-      <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/></svg></div>
-      <h3>Un vrai modèle de gisement</h3>
-      <p>Profil horaire reconstitué sur le jour moyen du mois, décomposition direct/diffus
-        par Erbs, transposition HDKR. Toute orientation, toute inclinaison. 34 villes de
-        référence, données modifiables.</p>
-    </div>
-    <div class="card">
-      <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
-      <h3>L'étude économique qui convainc</h3>
-      <p>Nomenclature chiffrée, flux de trésorerie sur 25 ans, valeur actuelle nette,
-        taux de rentabilité interne, temps de retour, coût du kWh produit, CO₂ évité.</p>
-    </div>
-    <div class="card">
-      <div class="ico"><svg viewBox="0 0 24 24"><path d="M6 2h9l3 3v17H6zM9 9h6M9 13h6M9 17h4"/></svg></div>
-      <h3>Votre marque, pas la nôtre</h3>
-      <p>Logo, raison sociale et coordonnées dans le cartouche et dans le rapport client.
-        Le document que vous rendez porte votre nom.</p>
-    </div>
-    <div class="card">
-      <div class="ico"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg></div>
-      <h3>Français, arabe, hors ligne</h3>
-      <p>Interface complète en trois langues avec écriture de droite à gauche. Installable
-        sur téléphone. Fonctionne sur un chantier sans réseau.</p>
+<div class="heros">
+  <div class="wrap">
+    <h1>Ce que le solaire vous ferait économiser, en deux minutes</h1>
+    <p class="accroche">Une estimation calculée sur <b>votre vraie facture STEG</b>,
+      pas sur une moyenne nationale. Gratuite, immédiate, sans compte à créer.</p>
+    <a class="btn primaire large" href="#tunnel">Faire mon étude gratuite</a>
+    <div class="preuves">
+      <div><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Calculée sur vos chiffres</div>
+      <div><svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg>Les 24 gouvernorats</div>
+      <div><svg viewBox="0 0 24 24"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></svg>Résultat immédiat</div>
     </div>
   </div>
-</div></section>
+</div>
 
-<section><div class="wrap">
-  <div class="split">
-    <div>
-      <span class="eyebrow">Étape 1 — le calcul</span>
-      <h2 style="font-size:clamp(23px,3vw,30px);margin-top:10px">Saisissez le besoin, l'outil propose la centrale.</h2>
-      <p style="margin-top:14px;color:var(--text-2)">
-        Facture annuelle, relevé mensuel ou liste d'équipements. Solarys en déduit la
-        puissance crête, choisit la longueur de chaîne compatible avec l'onduleur, et
-        affiche immédiatement le productible, le ratio de performance, l'autoconsommation
-        et le temps de retour.
-      </p>
-    </div>
-    <div class="shot dark"><img src="./captures/tableau-de-bord.png"
-      alt="Tableau de bord de Solarys : puissance crête, production annuelle, productible spécifique, ratio de performance, investissement, retour sur investissement, et graphique de production mensuelle" loading="lazy"></div>
-  </div>
-</div></section>
-
-<section><div class="wrap">
-  <div class="split reverse">
-    <div>
-      <span class="eyebrow">Étape 2 — l'ingénierie</span>
-      <h2 style="font-size:clamp(23px,3vw,30px);margin-top:10px">Chaque section justifiée par son critère dimensionnant.</h2>
-      <p style="margin-top:14px;color:var(--text-2)">
-        Longueurs de liaison, température ambiante des câbles, circuits jointifs,
-        conducteur cuivre ou aluminium, niveau kéraunique. L'outil retient la section
-        imposée par le critère le plus sévère et vous dit lequel — c'est ce qui rend la
-        note de calcul défendable devant un bureau de contrôle.
-      </p>
-    </div>
-    <div class="shot dark"><img src="./captures/cablage.png"
-      alt="Section câblage et protections : tableau des sections de câbles avec courant admissible, chute de tension et critère dimensionnant, puis calibres de fusibles, sectionneurs, disjoncteurs et parafoudres" loading="lazy"></div>
-  </div>
-</div></section>
-
-<section><div class="wrap">
-  <div class="section-head">
-    <span class="eyebrow">Étape 3 — le livrable</span>
-    <h2>Les planches que vous rendez au client.</h2>
-    <p>Générées à partir du dimensionnement, jamais redessinées à la main.</p>
-  </div>
-  <div class="shot"><img src="./captures/planche-cables-protections.png"
-    alt="Planche « câbles et protections » : tableau des câbles, tableau des protections et nomenclature chiffrée, avec cartouche complet" loading="lazy"></div>
-</div></section>
-
-<section id="comparatif"><div class="wrap">
-  <div class="section-head">
-    <span class="eyebrow">Comparatif</span>
-    <h2>Ce que font — et ne font pas — les autres outils.</h2>
-    <p>Tarifs publics constatés en 2026. Le tableau porte sur les fonctions, pas sur la qualité :
-      PVsyst reste la référence du productible bancable, et le restera.</p>
-  </div>
-  <div class="table-wrap"><table>
-    <thead><tr>
-      <th>Fonction</th><th class="c mine">Solarys</th><th class="c">OpenSolar</th>
-      <th class="c">PVsyst</th><th class="c">Aurora</th><th class="c">PVWatts</th>
-    </tr></thead>
-    <tbody>
-      <tr><th>Calcul du productible</th><td class="c mine yes">Oui</td><td class="c yes">Oui</td><td class="c yes">Oui</td><td class="c yes">Oui</td><td class="c yes">Oui</td></tr>
-      <tr><th>Vérification des chaînes / onduleur</th><td class="c mine yes">Oui</td><td class="c no">Non</td><td class="c yes">Oui</td><td class="c yes">Oui</td><td class="c no">Non</td></tr>
-      <tr><th>Sections de câbles calculées</th><td class="c mine yes">Oui</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td></tr>
-      <tr><th>Calibres de protections</th><td class="c mine yes">Oui</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td></tr>
-      <tr><th>Schéma unifilaire généré</th><td class="c mine yes">Oui</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td></tr>
-      <tr><th>Planches à cadre et cartouche</th><td class="c mine yes">Oui</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td></tr>
-      <tr><th>Interface arabe</th><td class="c mine yes">Oui</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td><td class="c no">Non</td></tr>
-      <tr><th>Fonctionne hors ligne</th><td class="c mine yes">Oui</td><td class="c no">Non</td><td class="c yes">Oui</td><td class="c no">Non</td><td class="c no">Non</td></tr>
-      <tr><th>Sur téléphone</th><td class="c mine yes">Oui</td><td class="c yes">Oui</td><td class="c no">Non</td><td class="c yes">Oui</td><td class="c yes">Oui</td></tr>
-      <tr><th>Prix annuel</th><td class="c mine"><b>voir ci-dessous</b></td><td class="c">gratuit</td><td class="c">≈ 700 CHF</td><td class="c">≈ 1 765 $</td><td class="c">gratuit</td></tr>
-    </tbody>
-  </table></div>
-  <p style="margin-top:14px;font-size:13px;color:var(--text-3)">
-    PVsyst et PV*SOL fonctionnent uniquement sous Windows. OpenSolar est gratuit mais ne
-    produit ni schéma unifilaire, ni note de calcul électrique, ni dossier de permis.
-  </p>
-</div></section>
-
-<section id="tarifs"><div class="wrap">
-  <div class="section-head">
-    <span class="eyebrow">Tarifs</span>
-    <h2>Un dossier sous-traité coûte 200 à 800 €. Solarys en produit un par projet.</h2>
-    <p>Tout est calculable gratuitement, sans compte et sans limite de durée : vous pouvez
-      mener un projet entier avant de décider. Le paiement retire le filigrane des planches
-      et y met votre marque. Et si vous ne rendez que deux ou trois études par an,
-      payez au dossier plutôt qu'à l'année.</p>
-  </div>
-
-  <div class="plans">
-    <div class="plan">
-      <span class="tag">Découverte</span>
-      <div class="price">0 €</div>
-      <ul>
-        <li>Tous les calculs, sans restriction</li>
-        <li>Projets illimités</li>
-        <li>Toutes les planches et le rapport</li>
-        <li class="off">Planches filigranées « avant-projet »</li>
-        <li class="off">Cartouche au nom du logiciel</li>
-      </ul>
-      <a class="btn" href="./app/">Commencer maintenant</a>
-    </div>
-
-    <div class="plan featured">
-      <span class="tag">À l'étude</span>
-      <div class="price">9 € <small>par dossier</small></div>
-      <ul>
-        <li>Un dossier client, sans filigrane</li>
-        <li>Votre logo dans le cartouche</li>
-        <li>Export SVG des planches</li>
-        <li>Aucun engagement, aucune date de fin</li>
-        <li>Le dossier payé le reste pour toujours</li>
-      </ul>
-      <a class="btn primary" data-plan="credits" href="#acheter">Acheter un dossier</a>
-      <p style="font-size:12.5px;color:var(--text-3);margin-top:-4px">
-        Pour l'installateur qui rend deux ou trois études par an.
-      </p>
-    </div>
-
-    <div class="plan">
-      <span class="tag">Perpétuelle — offre de lancement</span>
-      <div class="price">20 € <small>une seule fois</small></div>
-      <ul>
-        <li>Projets illimités, sans filigrane</li>
-        <li>Marque blanche complète</li>
-        <li>Version 1.x à vie, correctifs inclus</li>
-        <li>Clé de licence livrée par courriel</li>
-      </ul>
-      <a class="btn" data-plan="perpetual" href="#acheter">Acheter la licence</a>
-      <p style="font-size:12.5px;color:var(--text-3);margin-top:-4px">
-        Réservé aux 100 premières licences. Passera ensuite à 99 €.
-      </p>
-    </div>
-
-    <div class="plan">
-      <span class="tag">Pro — abonnement</span>
-      <div class="price">149 € <small>par an</small></div>
-      <ul>
-        <li>Tout ce que contient la licence perpétuelle</li>
-        <li>Toutes les versions majeures, sans surcoût</li>
-        <li>Bibliothèque de composants enrichie chaque trimestre</li>
-        <li>Support par courriel sous 48 h</li>
-        <li>Trois postes de travail</li>
-      </ul>
-      <a class="btn" data-plan="subscription" href="#acheter">S'abonner</a>
+<!-- ── Comment ça marche ───────────────────────────── -->
+<section id="marche">
+  <div class="wrap">
+    <h2 class="titre-section">Comment ça marche</h2>
+    <p class="sous-titre">Trois renseignements, tous écrits sur votre facture STEG.
+      Aucun compte, aucun démarchage.</p>
+    <div class="grille trois">
+      <div class="etape">
+        <div class="rond"><span class="num">1</span>
+          <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+        <h3>Votre gouvernorat</h3>
+        <p>Le soleil de Tozeur n’est pas celui de Bizerte. Le calcul en tient compte.</p>
+      </div>
+      <div class="etape">
+        <div class="rond"><span class="num">2</span>
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg></div>
+        <h3>Votre facture</h3>
+        <p>Consommation et montant annuels. On en déduit ce que vous payez
+          réellement le kilowattheure.</p>
+      </div>
+      <div class="etape">
+        <div class="rond"><span class="num">3</span>
+          <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div>
+        <h3>Votre étude</h3>
+        <p>Puissance conseillée, production, économie mensuelle et temps de retour.</p>
+      </div>
     </div>
   </div>
+</section>
 
-  <p class="disclaimer" style="margin-top:26px" id="acheter">
-    <b>Le paiement n'est pas encore ouvert.</b> Les formules ci-dessus sont celles
-    prévues ; le moyen de paiement sera branché prochainement. En attendant,
-    l'application est utilisable gratuitement et sans compte —
-    <a href="./app/">ouvrez-la et faites tourner un vrai projet</a>.
-  </p>
-</div></section>
+<!-- ── Le tunnel ───────────────────────────────────── -->
+<section class="creme" id="tunnel">
+  <div class="wrap">
+    <h2 class="titre-section">Votre étude photovoltaïque</h2>
+    <p class="sous-titre">Gratuite et instantanée. Vos réponses ne quittent
+      pas votre téléphone tant que vous ne nous écrivez pas.</p>
 
-<section><div class="wrap">
-  <div class="section-head">
-    <span class="eyebrow">Questions</span>
-    <h2>Ce qu'on nous demande le plus souvent.</h2>
+    <div class="jauge" id="jauge" aria-hidden="true"></div>
+
+    <form class="panneau" id="form" novalidate>
+      <div id="etapes"></div>
+      <p class="erreur" id="erreur" role="alert" aria-live="polite"></p>
+      <div class="actions">
+        <button class="btn" type="button" id="retour" hidden>Retour</button>
+        <button class="btn primaire" type="submit" id="suivant">Suivant</button>
+      </div>
+    </form>
+
+    <div class="resultat" id="resultat" hidden></div>
   </div>
+</section>
 
-  <details><summary>Les résultats sont-ils utilisables pour un dossier réel ?</summary>
-    <p>Les calculs suivent les méthodes de référence : Erbs et HDKR pour le gisement, NOCT
-      pour la température de cellule, la logique de l'IEC 62548 pour les chaînes, l'IEC
-      60364-5-52 pour les courants admissibles. Ils sont vérifiés par 29 tests automatiques.
-      Cela dit, comme pour tout outil de ce type, <b>les résultats restent indicatifs</b> :
-      toute installation doit être validée par un professionnel qualifié au regard des
-      normes applicables sur son marché. C'est écrit sur chaque planche et dans chaque
-      rapport.</p></details>
+<!-- ── Pourquoi nous ───────────────────────────────── -->
+<section id="pourquoi">
+  <div class="wrap">
+    <h2 class="titre-section">Pourquoi cette étude vaut mieux qu’un devis</h2>
+    <p class="sous-titre">Un installateur chiffre ce qu’il vend. Nous calculons
+      ce dont vous avez besoin.</p>
+    <div class="grille trois">
+      <div class="carte">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15l2 2 4-4"/></svg></div>
+        <h3>Vos chiffres, pas une moyenne</h3>
+        <p>Le prix du kilowattheure se déduit de votre facture. Une étude bâtie
+          sur vos chiffres, vous la reconnaissez ; une étude bâtie sur une
+          moyenne, vous la contestez.</p>
+      </div>
+      <div class="carte">
+        <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg></div>
+        <h3>Dimensionné pour être rentable</h3>
+        <p>On ne vise pas la plus grosse installation. Au-delà de ce que vous
+          consommez dans la journée, chaque panneau de plus rapporte moitié moins.</p>
+      </div>
+      <div class="carte">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h3>Rien à installer, rien à créer</h3>
+        <p>Pas de compte, pas de mot de passe, pas de démarchage. Le calcul se
+          fait dans votre navigateur et n’en sort pas.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
-  <details><summary>D'où viennent les données d'irradiation ?</summary>
-    <p>34 villes de référence sont livrées avec l'outil, avec leurs irradiations et
-      températures mensuelles. Ces valeurs sont destinées à l'avant-projet. Pour une étude
-      d'exécution, vous saisissez les données du site réel — PVGIS, NASA POWER, Meteonorm
-      ou une station locale — directement dans la section Gisement.</p></details>
+<!-- ── Questions ───────────────────────────────────── -->
+<section class="creme" id="questions">
+  <div class="wrap">
+    <h2 class="titre-section">Questions fréquentes</h2>
+    <p class="sous-titre">Ce qu’on nous demande avant de se lancer.</p>
+    <div class="faq">
+      <details>
+        <summary>L’estimation est-elle vraiment gratuite ?</summary>
+        <p>Oui, entièrement, et sans contrepartie : vous n’avez ni compte à créer
+          ni numéro à laisser pour la voir. Ce qui se paie, c’est l’étude
+          détaillée — le dossier qu’un installateur accepte comme base de devis.
+          Vous décidez après avoir vu l’estimation, pas avant.</p>
+      </details>
+      <details>
+        <summary>Où trouver ma consommation annuelle ?</summary>
+        <p>Sur votre facture STEG, dans le relevé de consommation, exprimée en
+          kWh. Les factures étant bimestrielles, additionnez les six de l’année,
+          ou multipliez une facture représentative par six. Une approximation
+          raisonnable suffit à l’estimation.</p>
+      </details>
+      <details>
+        <summary>Pourquoi demander le montant payé et pas seulement les kWh ?</summary>
+        <p>Parce que le tarif STEG est progressif et dépend de votre contrat :
+          deux foyers consommant autant ne paient pas le même prix. En divisant
+          votre montant par votre consommation, on obtient le prix que
+          <em>vous</em> payez réellement — et donc l’économie que
+          <em>vous</em> feriez.</p>
+      </details>
+      <details>
+        <summary>L’estimation remplace-t-elle une visite ?</summary>
+        <p>Non, et il faut le dire clairement. Elle ne voit ni l’orientation
+          exacte de votre toit, ni l’ombre du bâtiment voisin, ni l’état de votre
+          tableau électrique. Elle vous dit si le projet mérite d’être étudié.
+          L’étude détaillée, elle, entre dans ces sujets.</p>
+      </details>
+      <details>
+        <summary>Combien de temps dure une installation ?</summary>
+        <p>Les modules sont garantis vingt-cinq ans par les fabricants et
+          continuent de produire au-delà, avec une perte de rendement d’environ
+          un demi-pour-cent par an. L’onduleur, lui, se remplace généralement
+          une fois sur la durée de vie de l’installation.</p>
+      </details>
+    </div>
+  </div>
+</section>
 
-  <details><summary>Pourquoi la bibliothèque ne contient-elle pas les modèles du marché ?</summary>
-    <p>Volontairement. Une caractéristique recopiée devient fausse à la révision suivante
-      du produit, et un dimensionnement faux engage l'installateur. Par ailleurs les fiches
-      techniques et visuels des fabricants ne sont pas librement redistribuables. Solarys
-      livre des archétypes génériques exacts par construction, et vous créez votre
-      bibliothèque à partir des fiches de vos fournisseurs, en quelques minutes.</p></details>
+<section class="appel">
+  <div class="wrap">
+    <h2>Prêt à réduire votre facture STEG ?</h2>
+    <p>Deux minutes, trois chiffres, et vous saurez.</p>
+    <p><a class="btn fantome large" href="#tunnel" style="margin-top:28px">Commencer mon étude</a></p>
+  </div>
+</section>
 
-  <details><summary>Où sont stockés mes projets et ceux de mes clients ?</summary>
-    <p>Uniquement dans votre navigateur. Rien n'est envoyé à un serveur, aucun compte n'est
-      créé, aucune donnée client ne transite. Vous exportez vos projets en fichier pour les
-      sauvegarder ou les transférer sur un autre poste.</p></details>
+</main>
 
-  <details><summary>Faut-il une connexion internet ?</summary>
-    <p>Seulement au premier chargement. Ensuite l'application s'installe sur l'appareil et
-      fonctionne entièrement hors ligne — utile sur un chantier sans réseau.</p></details>
+<footer>
+  <div class="wrap">
+    <a class="logo" href="#haut">
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="1" y="20" width="5" height="6" rx="1" fill="#128a5e"/>
+        <rect x="8" y="15" width="5" height="11" rx="1" fill="#37a76b"/>
+        <rect x="15" y="10" width="5" height="16" rx="1" fill="#f9c846"/>
+        <rect x="22" y="4" width="5" height="22" rx="1" fill="#e0ac1f"/>
+        <rect x="1" y="28" width="26" height="2.4" rx="1.2" fill="#fff"/>
+      </svg>
+      <span><b>SOLARYS</b><span>Énergie solaire</span></span>
+    </a>
+    <div class="cols">
+      <div><p style="max-width:38ch;margin-top:14px">Solarys aide les foyers
+        tunisiens à savoir, chiffres en main, ce que le solaire changerait à
+        leur facture.</p></div>
+      <div><h4>Le site</h4><ul>
+        <li><a href="#marche">Comment ça marche</a></li>
+        <li><a href="#tunnel">Étude gratuite</a></li>
+        <li><a href="#pourquoi">Pourquoi nous</a></li>
+        <li><a href="#questions">Questions</a></li>
+      </ul></div>
+      <div><h4>À savoir</h4><ul>
+        <li><a href="#questions">Ce que l’estimation ne voit pas</a></li>
+        <li><a href="#tunnel">Vos données restent chez vous</a></li>
+      </ul></div>
+    </div>
+    <p class="bas">Les estimations sont indicatives et ne remplacent pas une
+      visite technique. © <span id="annee"></span> Solarys.</p>
+  </div>
+</footer>
 
-  <details><summary>Est-ce que ça remplace PVsyst ?</summary>
-    <p>Non, et ce n'est pas le but. PVsyst reste la référence pour une étude de productible
-      bancable devant un financeur, avec ombrage 3D détaillé. Solarys couvre ce que PVsyst
-      ne fait pas : l'ingénierie électrique et le dossier d'exécution. Beaucoup
-      d'installateurs utilisent les deux.</p></details>
-</div></section>
-
-<section class="cta-band"><div class="wrap">
-  <h2>Faites tourner un projet réel. Vous verrez en dix minutes.</h2>
-  <p>Gratuit, sans compte, dans votre navigateur.</p>
-  <div class="hero-cta"><a class="btn primary" href="./app/">Ouvrir Solarys</a></div>
-</div></section>
-
-<footer><div class="wrap">
-  <p class="disclaimer">
-    Solarys est un outil d'aide au dimensionnement. Les résultats qu'il produit sont
-    indicatifs et ne se substituent pas à l'étude d'un professionnel qualifié. Toute
-    installation électrique doit être conçue, vérifiée et réceptionnée conformément aux
-    normes en vigueur sur son marché.
-  </p>
-  <p>
-    © <span id="year">2026</span> Solarys · <a href="./app/">Application</a> ·
-    <a href="https://github.com/wajdibennaya5-max/Solarys">Code source</a>
-  </p>
-</div></footer>
-
-<script type="module">
-  // La vitrine ne connaît ni les prix ni les liens : elle les lit dans la
-  // boutique de l'application, pour qu'il n'existe qu'un seul endroit à
-  // modifier le jour où le paiement s'ouvre.
-  import { lienAchat, estOuverte, boutiqueOuverte } from './app/js/boutique.js';
-
-  document.getElementById('year').textContent = new Date().getFullYear();
-
-  const NOMS = {
-    credits: 'Dossiers à l\u2019unité',
-    perpetual: 'Licence perpétuelle',
-    subscription: 'Abonnement Pro',
-  };
-
-  let paiementEnLigne = false;
-  for (const bouton of document.querySelectorAll('[data-plan]')) {
-    const plan = bouton.dataset.plan;
-    const lien = lienAchat(plan, NOMS[plan] ?? plan);
-    if (!lien) continue;
-    bouton.href = lien;
-    bouton.target = '_blank';
-    bouton.rel = 'noopener noreferrer';
-    if (estOuverte(plan)) paiementEnLigne = true;
-    else bouton.textContent = 'Commander';
-  }
-
-  if (boutiqueOuverte()) {
-    document.getElementById('acheter').innerHTML = paiementEnLigne
-      ? 'Règlement en USDT, vérifié sur la chaîne TRON. La clé est délivrée '
-        + "sur-le-champ, sur la page de paiement, et ouvre <a href=\"./app/\">"
-        + "l'application</a> aussitôt — sans compte et sans attendre de réponse."
-
-      : 'Votre commande nous parvient directement, et nous convenons du '
-        + "règlement avec vous. La clé s'active ensuite dans "
-        + '<a href="./app/">l\u2019application</a> — onglet Réglages, '
-        + 'champ « Clé de licence ».';
-  }
-</script>
+<script type="module" src="./js/site.js"></script>
 </body>
 </html>
