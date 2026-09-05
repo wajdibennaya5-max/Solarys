@@ -6,29 +6,59 @@ en route : tout ce qu'elle utilise existe déjà dans le dépôt.
 
 ## La chaîne, en entier
 
+Depuis le règlement automatique, il y a deux chemins. Le premier ne vous
+demande **rien du tout**.
+
+### Chemin automatique — USDT, sans vous
+
 ```
    client sur le site
-        │  clique « Commander »
+        │  clique « Acheter »
         ▼
-   WhatsApp / courriel ────► la demande arrive, formule et prix déjà écrits
-        │                     (app/js/boutique.js — COMMANDE)
-        │  le client règle
+   paiement.html ──────► montant en USDT, adresse, réseau
+        │  il envoie depuis son portefeuille
+        │  il colle l'empreinte de sa transaction
         ▼
-   USDT / virement / espèces ─► vous constatez le règlement vous-même
-        │                        (app/js/boutique.js — PAIEMENT)
-        │
+   vérification sur la chaîne TRON, dans son navigateur
+        │  transfert USDT · vers notre adresse · montant suffisant
         ▼
-   node tools/cle.mjs "<client>" ─► la clé, et le message à renvoyer
-        │
-        ▼
-   le client colle la clé ────► Réglages → « Clé de licence »
+   clé émise, licence déposée, application ouverte sans filigrane
 ```
 
-Aucune étape n'est automatique entre le règlement et la clé : **c'est vous qui
-constatez le paiement et qui émettez**. En dessous de quelques ventes par jour,
-c'est le bon compromis — cela évite d'attendre la validation d'un compte
-marchand pour encaisser sa première licence, et cela fonctionne dans les pays
-où Stripe et PayPal n'encaissent pas.
+Vous n'intervenez pas. Vous constatez l'USDT arrivé sur Bybit, c'est tout.
+
+La clé est dérivée de l'empreinte de la transaction : **rejouer la même
+transaction redonne toujours la même clé**, jamais une nouvelle. Personne ne
+peut donc en fabriquer à la chaîne avec un paiement unique.
+
+### Chemin manuel — virement, espèces, tout le reste
+
+```
+   client ──► WhatsApp / courriel ──► vous constatez le règlement
+                                            │
+                                            ▼
+                            node tools/cle.mjs "<client>"
+                                            │
+                                            ▼
+                            vous envoyez la clé
+```
+
+C'est le chemin des clients professionnels, qui règlent par virement et non
+en USDT. Il reste indispensable : un bureau d'études européen ne paiera pas
+en crypto.
+
+### Ce que la vérification automatique ne fait pas
+
+Elle tourne dans le navigateur de l'acheteur, donc elle est contournable, et
+l'empreinte d'une transaction est publique — un tiers pourrait reprendre
+celle d'un vrai client. Le pire cas reste une clé partagée, exactement ce que
+`app/js/licence.js` assume déjà : la licence est une commodité, pas une
+protection. Ce qui protège ce produit, c'est la mise à jour et le support.
+
+Elle n'attend pas non plus les 20 confirmations que Bybit exige pour créditer
+votre solde : la clé part dès que la transaction est indexée sur la chaîne.
+Sur TRON l'écart se compte en secondes, et pour 22 USDT le risque est
+négligeable — mais il est réel, et il vaut mieux le savoir.
 
 ## 1. Ouvrir la vente
 
@@ -86,28 +116,30 @@ Trois chemins, du plus simple au plus contraignant.
 | **Virement ou espèces, puis P2P** | bureau d'études, installateur, client local | 1 à 2 jours | un compte bancaire ou de la main à la main |
 | **Plateforme (Payoneer, Paddle…)** | vente à l'international, à terme | jours | un compte vérifié |
 
-### USDT en direct
+### USDT en direct — automatique
 
-**Déjà configuré** — l'adresse de dépôt TRON et son réseau sont dans
-`PAIEMENT.usdt`, et chaque commande les annonce à l'acheteur. Un test valide
-la somme de contrôle de l'adresse à chaque exécution de la suite : si un
+**Déjà en place.** L'adresse, le réseau et les prix en USDT sont dans
+`app/js/boutique.js`, et `paiement.html` fait le reste. Un test valide la
+somme de contrôle de l'adresse à chaque exécution de la suite : si un
 caractère venait à changer, les tests échoueraient avant qu'un client n'envoie
 quoi que ce soit dans le vide.
 
-Pour la changer un jour : dans Bybit, *Dépôt → USDT → choisir le réseau*,
-copier l'adresse **et** noter le réseau, puis les reporter dans
-`PAIEMENT.usdt`. Ne la recopiez jamais à l'œil depuis une capture d'écran —
-lancez `npm test` après.
+Les prix en USDT se relisent dans `OFFRES` :
 
-Deux points sur lesquels on ne se rattrape pas :
+```js
+credits:      { prix: '9 €',   usdt: 10  },
+perpetual:    { prix: '20 €',  usdt: 22  },
+subscription: { prix: '149 €', usdt: 160 },
+```
 
-- **Le réseau doit correspondre.** Un USDT envoyé sur un réseau que l'adresse
-  ne dessert pas est perdu, définitivement. C'est pour cela que le réseau est
-  annoncé au client en même temps que l'adresse.
-- **Rien ne confirme le paiement à votre place.** Vous vérifiez l'arrivée dans
-  Bybit avant d'émettre la clé — un dépôt est crédité après 20 confirmations,
-  soit environ une minute sur TRON. N'émettez jamais une clé sur la foi d'une
-  capture d'écran envoyée par l'acheteur : elle ne prouve rien.
+Ce ne sont pas des conversions du jour, mais des prix arrondis avec la marge
+qui absorbe le change et les frais de réseau. Corrigez-les si l'euro décroche.
+Retirer la valeur `usdt` d'une formule ferme son règlement automatique sans
+rien casser ailleurs.
+
+Pour changer l'adresse un jour : dans Bybit, *Dépôt → USDT → choisir le
+réseau*, copier l'adresse **et** noter le réseau. Ne la recopiez jamais à
+l'œil depuis une capture d'écran — lancez `npm test` après.
 
 ### Virement ou espèces, puis P2P
 

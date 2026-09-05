@@ -21,18 +21,30 @@ export const OFFRES = {
     prix: '9 €',
     unite: '/ dossier',
     lien: '',
+    usdt: 10,
   },
   perpetual: {
     prix: '20 €',
     unite: 'une fois',
     lien: '',
+    usdt: 22,
   },
   subscription: {
     prix: '149 €',
     unite: '/ an',
     lien: '',
+    usdt: 160,
   },
 };
+
+/**
+ * `usdt` : prix de la formule en USDT, pour le règlement automatique.
+ *
+ * Ce n'est pas la conversion du jour : c'est un prix arrondi, avec la marge
+ * qui absorbe le change et les frais de réseau. Il se relit et se corrige
+ * ici, sans toucher au reste. Retirer la valeur ferme le paiement
+ * automatique pour cette formule, sans rien casser ailleurs.
+ */
 
 /**
  * Adresse à laquelle un acheteur écrit si sa clé n'arrive pas.
@@ -110,8 +122,34 @@ export function moyensDePaiement() {
   return out;
 }
 
-/** Cette formule mène-t-elle à un paiement en ligne ? */
-export const estOuverte = (plan) => Boolean(OFFRES[plan]?.lien);
+/**
+ * Racine du site, vue depuis la page courante.
+ *
+ * La vitrine est à la racine, l'application dans `/app/`. Une adresse écrite
+ * en dur serait juste dans l'une et fausse dans l'autre ; on la déduit donc
+ * de la page qui pose la question. Hors navigateur — les tests —, la racine
+ * est le répertoire courant.
+ */
+export function racineSite() {
+  return /(^|\/)app\/?$|\/app\//.test(globalThis.location?.pathname ?? '') ? '../' : './';
+}
+
+/**
+ * Cette formule peut-elle être réglée sans intervention humaine ?
+ * Il y faut une adresse de dépôt et un prix en USDT : sans l'un des deux, la
+ * page de paiement n'aurait rien à vérifier.
+ */
+export const paiementAutomatique = (plan) =>
+  Boolean(PAIEMENT.usdt?.adresse && OFFRES[plan]?.usdt);
+
+/**
+ * Cette formule mène-t-elle à un paiement immédiat ?
+ * Vrai pour une plateforme externe comme pour notre page de règlement USDT :
+ * dans les deux cas l'acheteur n'attend pas de réponse humaine, et le bouton
+ * doit dire « Acheter » plutôt que « Commander ».
+ */
+export const estOuverte = (plan) =>
+  Boolean(OFFRES[plan]?.lien) || paiementAutomatique(plan);
 
 /** Une commande directe est-elle possible ? */
 export const commandeDirecte = () =>
@@ -128,6 +166,11 @@ export function lienAchat(plan, nomFormule = plan) {
   const offre = OFFRES[plan];
   if (!offre) return null;
   if (offre.lien) return offre.lien;
+  // Le règlement automatique passe avant la commande directe : la clé y est
+  // livrée sur-le-champ, sans que personne ait à répondre.
+  if (paiementAutomatique(plan)) {
+    return `${racineSite()}paiement.html?plan=${encodeURIComponent(plan)}`;
+  }
   if (!commandeDirecte()) return null;
 
   // Quand un moyen de règlement est connu, l'acheteur peut payer sans

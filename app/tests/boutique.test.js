@@ -8,7 +8,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { OFFRES, ORDRE, CONTACT, PAIEMENT, estOuverte, estVendable, boutiqueOuverte } from '../js/boutique.js';
+import { OFFRES, ORDRE, CONTACT, PAIEMENT, estOuverte, estVendable,
+  paiementAutomatique, boutiqueOuverte } from '../js/boutique.js';
 import { PLANS, makeKey, readKey } from '../js/licence.js';
 
 const formulesConnues = Object.values(PLANS).map((p) => p.id);
@@ -42,13 +43,63 @@ test('chaque offre porte un prix et une unité affichables', () => {
   }
 });
 
-test('un lien vide ferme le paiement en ligne, un lien renseigné l\'ouvre', () => {
-  const vide = { ...OFFRES.perpetual, lien: '' };
-  assert.equal(Boolean(vide.lien), false);
-  // `estOuverte` lit la configuration réelle : elle doit rester cohérente
-  // avec elle, quel que soit son état au moment du test.
+test('un paiement immédiat s\'ouvre par un lien externe ou par notre page', () => {
+  // « Ouverte » ne veut pas dire « lien externe » : notre page de règlement
+  // USDT livre aussi sans attente humaine, et mérite le même libellé.
   for (const plan of ORDRE) {
-    assert.equal(estOuverte(plan), Boolean(OFFRES[plan].lien));
+    assert.equal(estOuverte(plan), Boolean(OFFRES[plan].lien) || paiementAutomatique(plan));
+  }
+});
+
+test('le règlement automatique exige une adresse ET un prix en USDT', async () => {
+  // Sans l'un des deux, la page de paiement n'aurait rien à vérifier.
+  const m = await avecConfig({ usdt: 'TBp9gdAeYdsiFvg7vKGoq2cM5TohLgbADB' });
+  assert.equal(m.paiementAutomatique('perpetual'), true);
+
+  const sansPrix = await avecConfig({ usdt: 'TBp9gdAeYdsiFvg7vKGoq2cM5TohLgbADB' });
+  delete sansPrix.OFFRES.perpetual.usdt;
+  assert.equal(sansPrix.paiementAutomatique('perpetual'), false);
+
+  const sansAdresse = await avecConfig({});
+  assert.equal(sansAdresse.paiementAutomatique('perpetual'), false);
+});
+
+test('le règlement automatique mène à notre page, avec la formule', async () => {
+  const m = await avecConfig({ usdt: 'TBp9gdAeYdsiFvg7vKGoq2cM5TohLgbADB' });
+  assert.equal(m.lienAchat('perpetual'), './paiement.html?plan=perpetual');
+  assert.equal(m.estOuverte('perpetual'), true, 'le bouton doit dire « Acheter »');
+});
+
+test('le règlement automatique passe avant la commande directe', async () => {
+  // Sinon un acheteur prêt à payer serait renvoyé vers une attente humaine.
+  const m = await avecConfig({
+    usdt: 'TBp9gdAeYdsiFvg7vKGoq2cM5TohLgbADB', whatsapp: '21612345678',
+  });
+  assert.match(m.lienAchat('perpetual'), /^\.\/paiement\.html/);
+});
+
+test('un lien externe passe avant tout le reste', async () => {
+  const m = await avecConfig({
+    lien: 'https://paiement.test/x',
+    usdt: 'TBp9gdAeYdsiFvg7vKGoq2cM5TohLgbADB', whatsapp: '21612345678',
+  });
+  assert.equal(m.lienAchat('perpetual'), 'https://paiement.test/x');
+});
+
+test('la racine du site se déduit de la page qui pose la question', async () => {
+  // La vitrine est à la racine, l'application dans /app/ : une adresse écrite
+  // en dur serait juste dans l'une et fausse dans l'autre.
+  const m = await avecConfig({ usdt: 'TBp9gdAeYdsiFvg7vKGoq2cM5TohLgbADB' });
+  const initial = globalThis.location;
+  try {
+    globalThis.location = { pathname: '/Solarys/app/' };
+    assert.equal(m.racineSite(), '../');
+    assert.match(m.lienAchat('perpetual'), /^\.\.\/paiement\.html/);
+    globalThis.location = { pathname: '/Solarys/' };
+    assert.equal(m.racineSite(), './');
+  } finally {
+    if (initial === undefined) delete globalThis.location;
+    else globalThis.location = initial;
   }
 });
 
@@ -87,11 +138,14 @@ test('tout lien renseigné est une adresse https', () => {
 // `lienAchat` lit la configuration du module. Pour éprouver ses trois états
 // sans toucher au fichier livré, on recharge le module avec une configuration
 // modifiée en mémoire.
-async function avecConfig({ lien = '', whatsapp = '', courriel = '' }) {
+async function avecConfig({ lien = '', whatsapp = '', courriel = '', usdt = '' }) {
   const m = await import(`../js/boutique.js?essai=${Math.random()}`);
   m.OFFRES.perpetual.lien = lien;
   m.COMMANDE.whatsapp = whatsapp;
   m.COMMANDE.courriel = courriel;
+  // Le règlement automatique passe avant la commande directe : le laisser
+  // branché ferait porter à ces tests-là autre chose que ce qu'ils annoncent.
+  m.PAIEMENT.usdt = { adresse: usdt, reseau: usdt ? 'TRON (TRC20)' : '' };
   return m;
 }
 
@@ -190,14 +244,14 @@ test('virement et arrangement direct s\'ajoutent aux moyens', async () => {
 });
 
 test('les moyens connus figurent dans le message de commande', async () => {
-  // C'est tout l'intérêt : l'acheteur paie sans attendre une réponse humaine.
-  const m = await import(`../js/boutique.js?commande=${Math.random()}`);
-  m.COMMANDE.whatsapp = '21612345678';
-  m.PAIEMENT.usdt = { adresse: 'TXyz000', reseau: 'TRC20' };
+  // On éprouve ici la commande directe, donc un moyen qui ne déclenche pas
+  // le règlement automatique : le virement se convient, il ne se vérifie pas
+  // sur une chaîne.
+  const m = await avecConfig({ whatsapp: '21612345678' });
+  m.PAIEMENT.virement = 'IBAN TN59 1234';
   const texte = decodeURIComponent(
     new URL(m.lienAchat('perpetual', 'Licence perpétuelle')).searchParams.get('text'));
-  assert.match(texte, /TXyz000/);
-  assert.match(texte, /TRC20/);
+  assert.match(texte, /IBAN TN59 1234/);
   assert.doesNotMatch(texte, /indiquer comment régler/);
 });
 
