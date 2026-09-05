@@ -363,3 +363,217 @@ export function panneauHypotheses(sim) {
       là qu’un installateur doit porter son attention.</p>
   </details>`;
 }
+
+/* ------------------------------------------------------------------ */
+/* Analyse financière, optimiseur, laboratoire, assistant              */
+/* ------------------------------------------------------------------ */
+
+const dt = (v) => (v === null || v === undefined ? '—'
+  : `${Math.round(v).toLocaleString('fr-FR')} DT`);
+const ans = (v) => (v === null || v === undefined ? 'plus de 25 ans'
+  : `${v.toFixed(1).replace('.', ',')} ans`);
+const pct = (v) => (v === null || v === undefined ? '—'
+  : `${(v * 100).toFixed(1).replace('.', ',')} %`);
+
+/**
+ * L'ANALYSE FINANCIÈRE : trois jeux d'hypothèses, et ce qui les sépare.
+ *
+ * Le tableau des paramètres n'est pas un ornement : sans lui, trois colonnes
+ * de résultats différents passent pour un tour de passe-passe. C'est en
+ * lisant « hausse de l'électricité : 3 % contre 8 % » qu'on comprend l'écart.
+ */
+export function panneauFinancier(jeux, nonPrisEnCompte = []) {
+  if (!jeux?.length) return '';
+  const central = jeux.find((j) => j.defaut) ?? jeux[0];
+
+  const lignes = [
+    ['Investissement', (j) => dt(j.flux.investissement)],
+    ['Économie la 1re année', (j) => dt(j.flux.economieAn1)],
+    ['Retour simple', (j) => ans(j.flux.retour)],
+    ['Retour actualisé', (j) => ans(j.flux.retourActualise)],
+    ['Gain net sur la durée', (j) => dt(j.flux.gainNet)],
+    ['Valeur actuelle nette', (j) => dt(j.flux.van)],
+    ['Taux de rendement interne', (j) => (j.flux.tri === null ? '—' : pct(j.flux.tri))],
+    ['Coût du kWh produit', (j) => (j.flux.lcoe === null ? '—'
+      : `${j.flux.lcoe.toFixed(3).replace('.', ',')} DT`)],
+  ];
+
+  return `<div class="fin">
+    <div class="fin-defile">
+      <table class="fin-table">
+        <thead><tr><th scope="col">Indicateur</th>
+          ${jeux.map((j) => `<th scope="col" class="${j.defaut ? 'fin-central' : ''}">
+            ${j.nom}<span>${j.resume}</span></th>`).join('')}</tr></thead>
+        <tbody>
+          ${lignes.map(([nom, lire]) => `<tr><th scope="row">${nom}</th>
+            ${jeux.map((j) => `<td class="${j.defaut ? 'fin-central' : ''}">${
+              lire(j)}</td>`).join('')}</tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="fin-ecarts">
+      ${jeux.filter((j) => !j.defaut).map((j) => `<div class="fin-ecart">
+        <p class="fin-ecart-titre">${j.nom} — ce qui change par rapport au standard</p>
+        <ul>${j.ecarts.map((e) => `<li>${e.libelle} : <b>${e.de}</b> →
+          <b>${e.a}</b></li>`).join('')}</ul>
+      </div>`).join('')}
+    </div>
+
+    <p class="fin-lcoe">Le <b>coût du kWh produit</b> est le seul chiffre qui se
+      compare directement à votre tarif STEG : c’est ce que revient un
+      kilowattheure sorti de vos panneaux, entretien et actualisation compris,
+      sur toute la durée d’analyse.</p>
+
+    ${nonPrisEnCompte.length ? `<div class="fin-hors">
+      <p><b>Ce qui n’est pas pris en compte :</b></p>
+      <ul>${nonPrisEnCompte.map((t) => `<li>${t}</li>`).join('')}</ul>
+    </div>` : ''}
+
+    <details class="fin-params"><summary>Les ${
+      central.parametres ? Object.keys(central.parametres).length : 0} paramètres du
+      jeu standard</summary>
+      <dl>${(central.listeParametres ?? []).map((p) => `<div>
+        <dt>${p.libelle}</dt><dd>${p.ecrit}${p.unite ? ` ${p.unite}` : ''}</dd>
+        <p>${p.aide}</p></div>`).join('')}</dl>
+    </details>
+  </div>`;
+}
+
+/**
+ * L'OPTIMISEUR : trois configurations, l'objectif choisi, les contraintes.
+ *
+ * Le mot « recommandée » n'apparaît jamais seul : il est toujours suivi de
+ * l'objectif et du critère qui l'ont produit.
+ */
+export function panneauOptimiseur(resultat, objectifs, idCourant) {
+  if (!resultat) {
+    return `<p class="note">L’optimisation demande une consommation et une
+      localisation exploitables.</p>`;
+  }
+  return `<div class="opt">
+    <div class="opt-objectifs" role="radiogroup" aria-label="Objectif d’optimisation">
+      ${objectifs.map((o) => `<button type="button" class="carte-choix${
+        o.id === idCourant ? ' choisi' : ''}" role="radio"
+        aria-checked="${o.id === idCourant}" data-objectif="${o.id}">
+        <b>${o.nom}</b><span>${o.resume}</span></button>`).join('')}
+    </div>
+
+    <p class="opt-critere"><b>Critère appliqué :</b> ${resultat.objectif.critere}.
+      ${resultat.objectif.detail}</p>
+
+    <div class="opt-configs">
+      ${resultat.configurations.map((c) => `<div class="opt-config${
+        c.rang === 1 ? ' opt-retenue' : ''}">
+        <p class="opt-lettre">Configuration ${c.lettre}${
+          c.rang === 1 ? ' — retenue' : ''}</p>
+        <p class="opt-kwc">${String(c.puissance).replace('.', ',')} <span>kWc</span></p>
+        <dl>
+          <div><dt>Modules</dt><dd>${c.modules} × ${c.module.puissance} Wc</dd></div>
+          <div><dt>Production</dt><dd>${c.production.toLocaleString('fr-FR')} kWh/an</dd></div>
+          <div><dt>Couverture</dt><dd>${Math.round(c.couverture * 100)} %</dd></div>
+          <div><dt>Surface</dt><dd>${c.surface} m²</dd></div>
+          <div><dt>Coût</dt><dd>${dt(c.cout)}</dd></div>
+          <div><dt>Retour actualisé</dt><dd>${ans(c.retourActualise)}</dd></div>
+          <div><dt>Valeur actuelle nette</dt><dd>${dt(c.van)}</dd></div>
+        </dl>
+      </div>`).join('')}
+    </div>
+
+    <p class="opt-phrase">${resultat.recommandation.phrase}</p>
+
+    <details class="opt-contraintes"><summary>Contraintes appliquées (${
+      resultat.exploré} configurations examinées)</summary>
+      <ul>${resultat.contraintes.map((c) => `<li>${c.texte}</li>`).join('')}</ul>
+    </details>
+  </div>`;
+}
+
+/** LE LABORATOIRE : plusieurs projets côte à côte, distinctions comprises. */
+export function panneauLaboratoire(lab) {
+  if (!lab?.variantes?.length) return '';
+  const calculables = lab.variantes.filter((v) => v.calculable);
+  const ecrire = (c, v) => {
+    if (v === null || v === undefined) return '—';
+    if (c.texte) return v;
+    if (c.pourcent) return `${Math.round(v * 100)} %`;
+    return Number(v).toLocaleString('fr-FR',
+      { minimumFractionDigits: c.decimales ?? 0, maximumFractionDigits: c.decimales ?? 0 });
+  };
+
+  return `<div class="lab">
+    <div class="fin-defile">
+      <table class="fin-table">
+        <thead><tr><th scope="col">Indicateur</th>
+          ${lab.variantes.map((v) => `<th scope="col">${v.nom}${
+            v.calculable ? '' : '<span>non calculable</span>'}</th>`).join('')}</tr></thead>
+        <tbody>
+          ${lab.colonnes.map((c) => `<tr><th scope="row">${c.nom}${
+            c.unite ? ` <i>${c.unite}</i>` : ''}</th>
+            ${lab.variantes.map((v) => `<td>${v.calculable
+              ? ecrire(c, v.valeurs[c.cle]) : '—'}</td>`).join('')}</tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    ${lab.distinctions.length ? `<div class="lab-medailles">
+      ${lab.distinctions.map((d) => `<div class="lab-medaille">
+        <p class="lab-titre">${d.titre}</p>
+        <p class="lab-gagnant">${d.exaequo ? d.exaequo.join(' et ') : d.nom}</p>
+        <p class="lab-critere">${d.critere}</p>
+      </div>`).join('')}
+    </div>` : ''}
+
+    ${lab.nonDecernees.length ? `<div class="lab-non">
+      <p><b>Distinctions non décernées :</b></p>
+      <ul>${lab.nonDecernees.map((d) => `<li><b>${d.titre}</b> — ${d.raison}</li>`)
+    .join('')}</ul>
+      <p class="lab-non-txt">Décerner une distinction dont le critère n’est pas
+        calculable partout reviendrait à cacher une donnée manquante derrière une
+        médaille.</p>
+    </div>` : ''}
+
+    ${calculables.length < 2 ? `<p class="note">Il faut au moins deux variantes
+      calculables pour comparer.</p>` : ''}
+  </div>`;
+}
+
+/** L'ASSISTANT : ses suggestions, son champ, sa dernière réponse. */
+export function panneauCopilote(sugg, modes, modeCourant) {
+  return `<div class="copi">
+    <div class="copi-modes" role="radiogroup" aria-label="Niveau de réponse">
+      ${modes.map((m) => `<button type="button" class="copi-mode${
+        m.id === modeCourant ? ' choisi' : ''}" role="radio"
+        aria-checked="${m.id === modeCourant}" data-mode="${m.id}">${m.nom}</button>`)
+    .join('')}
+    </div>
+    <div class="copi-reponse" id="copiReponse" role="status" aria-live="polite">
+      <p class="copi-vide">Posez une question sur cette étude. Je réponds à partir de
+        vos chiffres — et uniquement à partir d’eux.</p>
+    </div>
+    <div class="copi-sugg" id="copiSugg">
+      ${sugg.map((q) => `<button type="button" class="copi-q" data-question="${
+        q.replace(/"/g, '&quot;')}">${q}</button>`).join('')}
+    </div>
+    <form class="copi-champ" id="copiForm">
+      <input id="copiQuestion" type="text" autocomplete="off"
+        placeholder="Votre question sur cette étude…"
+        aria-label="Votre question sur cette étude">
+      <button class="btn primaire" type="submit">Demander</button>
+    </form>
+  </div>`;
+}
+
+/** Une réponse de l'assistant, avec ce qui lui manquait s'il y a lieu. */
+export function reponseCopilote(r) {
+  if (!r) return '';
+  const paragraphes = r.texte.split('\n\n')
+    .map((t) => `<p>${t.replace(/\n/g, '<br>')}</p>`).join('');
+  return `<div class="copi-bulle ${r.comprise ? '' : 'copi-refus'}">
+    ${paragraphes}
+    ${r.manque?.length ? `<p class="copi-manque">Données absentes du projet :
+      ${r.manque.join(', ')}.</p>` : ''}
+    ${r.propositions?.length ? `<ul class="copi-props">${
+      r.propositions.slice(0, 5).map((p) => `<li>${p}</li>`).join('')}</ul>` : ''}
+  </div>`;
+}

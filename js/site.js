@@ -23,6 +23,14 @@ import { carteCentrale, grilleKpi, carteScore, avertissement, phraseCo2,
   panneauTechnique, bandeauNiveau, panneauAlertes, panneauTracabilite,
   panneauHypotheses } from './tableau.js';
 import { simuler } from './moteur.js';
+import { comparerJeux, listerParametres, jeu as jeuFinancier, NON_PRIS_EN_COMPTE }
+  from './finances.js';
+import { optimiser as optimiserProjet, OBJECTIFS } from './optimiseur.js';
+import { comparer as comparerVariantes, variantesProposees } from './laboratoire.js';
+import { repondre as repondreCopilote, suggestions as suggestionsCopilote, MODES }
+  from './copilote.js';
+import { panneauFinancier, panneauOptimiseur, panneauLaboratoire, panneauCopilote,
+  reponseCopilote } from './tableau.js';
 import { dimensionner, verdictGlobal } from './technique.js';
 import { construireRapport } from './rapport.js';
 import { reponses, simulation, reinitialiserSimulation, cotesToit, reglagePose,
@@ -988,6 +996,37 @@ function dessinerResultat() {
       <div class="graphe" id="planToit"></div>
     </div>
 
+    <div class="bloc" id="blocFinancier">
+      <h4>Analyse financière</h4>
+      <p class="note">Les mêmes panneaux, sous trois jeux d’hypothèses. Ce ne sont
+        pas trois humeurs : ce sont trois valeurs des mêmes paramètres, écrites
+        sous le tableau.</p>
+      <div id="zoneFinancier"></div>
+    </div>
+
+    <div class="bloc" id="blocOptimiseur">
+      <h4>Optimisation selon votre objectif</h4>
+      <p class="note">Il n’existe pas de configuration optimale dans l’absolu : la
+        plus rentable est petite, la plus productive est grande, et elles ne
+        peuvent pas être la même. Choisissez ce que vous cherchez.</p>
+      <div id="zoneOptimiseur"></div>
+    </div>
+
+    <div class="bloc" id="blocLaboratoire">
+      <h4>Comparer plusieurs projets</h4>
+      <p class="note">Le projet actuel, un plus petit, un plus grand, et le même
+        sous des hypothèses prudentes — côte à côte.</p>
+      <div id="zoneLaboratoire"></div>
+    </div>
+
+    <div class="bloc bloc-copilote" id="blocCopilote">
+      <h4>Assistant</h4>
+      <p class="note">Il lit cette étude et répond sur ses chiffres. Il n’a aucune
+        connaissance propre : quand une donnée manque, il le dit au lieu de
+        l’inventer.</p>
+      <div id="zoneCopilote"></div>
+    </div>
+
     <div class="bloc">
       <h4>Le détail</h4>
       <dl id="detail"></dl>
@@ -1086,6 +1125,8 @@ function dessinerResultat() {
   $('resultat').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   brancherRapport();
+  brancherOptimiseur();
+  brancherCopilote();
 
   $('recommencer').addEventListener('click', () => {
     etape = 0;
@@ -1178,6 +1219,91 @@ function demanderRafraichissement() {
 
 /** La dernière simulation complète, pour l'assistant et le rapport. */
 let simulationCourante = null;
+
+/** L'objectif d'optimisation et le mode de l'assistant, choisis par le visiteur. */
+let objectifCourant = 'equilibre';
+let modeCopilote = 'client';
+
+/** L'analyse financière : trois jeux d'hypothèses sur la même installation. */
+function dessinerFinancier(e) {
+  const hote = $('zoneFinancier');
+  if (!hote) return;
+  const jeux = comparerJeux({ puissance: e.puissance, autoconsomme: e.autoconsomme,
+    surplus: e.surplus, prixKwh: e.prixKwh });
+  const central = jeux.find((j) => j.defaut);
+  if (central) central.listeParametres = listerParametres(central.parametres);
+  hote.innerHTML = panneauFinancier(jeux, NON_PRIS_EN_COMPTE);
+}
+
+/** L'optimiseur, avec l'objectif retenu par le visiteur. */
+function dessinerOptimiseur() {
+  const hote = $('zoneOptimiseur');
+  if (!hote) return;
+  const d = donneesEtude();
+  const toit = cotesToit();
+  const r = d ? optimiserProjet({ ...d, toitL: toit.L, toitP: toit.P },
+    { objectif: objectifCourant }) : null;
+  hote.innerHTML = panneauOptimiseur(r, OBJECTIFS, objectifCourant);
+}
+
+/** Le laboratoire : plusieurs projets comparés côte à côte. */
+function dessinerLaboratoire(e) {
+  const hote = $('zoneLaboratoire');
+  if (!hote) return;
+  const d = donneesEtude();
+  if (!d) { hote.innerHTML = ''; return; }
+  hote.innerHTML = panneauLaboratoire(
+    comparerVariantes(d, variantesProposees(d, { puissanceCourante: e.puissance })));
+}
+
+/** Le choix d'objectif redessine l'optimiseur, et lui seul. */
+function brancherOptimiseur() {
+  const hote = $('zoneOptimiseur');
+  if (!hote || hote.dataset.branche === 'oui') return;
+  hote.dataset.branche = 'oui';
+  hote.addEventListener('click', (ev) => {
+    const carte = ev.target.closest('[data-objectif]');
+    if (!carte || carte.dataset.objectif === objectifCourant) return;
+    objectifCourant = carte.dataset.objectif;
+    dessinerOptimiseur();
+  });
+}
+
+/**
+ * L'ASSISTANT. Il ne parle qu'à partir de `simulationCourante` : c'est ce qui
+ * garantit qu'il ne peut rien dire que l'étude ne contienne pas.
+ */
+function brancherCopilote() {
+  const hote = $('zoneCopilote');
+  if (!hote) return;
+  hote.innerHTML = panneauCopilote(suggestionsCopilote(simulationCourante),
+    MODES, modeCopilote);
+
+  const poser = (question) => {
+    if (!question) return;
+    const r = repondreCopilote(question, simulationCourante, modeCopilote);
+    $('copiReponse').innerHTML = `<p class="copi-question">« ${
+      question.replace(/</g, '&lt;')} »</p>` + reponseCopilote(r);
+  };
+
+  hote.addEventListener('click', (ev) => {
+    const q = ev.target.closest('[data-question]');
+    if (q) { poser(q.dataset.question); return; }
+    const m = ev.target.closest('[data-mode]');
+    if (!m || m.dataset.mode === modeCopilote) return;
+    modeCopilote = m.dataset.mode;
+    for (const b of hote.querySelectorAll('[data-mode]')) {
+      const actif = b.dataset.mode === modeCopilote;
+      b.classList.toggle('choisi', actif);
+      b.setAttribute('aria-checked', String(actif));
+    }
+  });
+
+  $('copiForm')?.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    poser($('copiQuestion').value.trim());
+  });
+}
 
 /** Redessine tout ce qui dépend des curseurs. */
 function rafraichir() {
@@ -1307,6 +1433,10 @@ function rafraichir() {
   $('zoneHypotheses').innerHTML = panneauHypotheses(simulationCourante);
   // Un panneau qu'on lisait ne doit pas se refermer parce qu'un curseur a bougé.
   for (const id of ouverts) { const d = $(id); if (d) d.open = true; }
+
+  dessinerFinancier(e);
+  dessinerOptimiseur();
+  dessinerLaboratoire(e);
 
   $('avertissement').innerHTML = avertissement(e, HYPOTHESES);
 

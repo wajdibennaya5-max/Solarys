@@ -670,6 +670,114 @@ details[open]>summary .hy-titre::before{content:'– '}
 .hy-doute td{color:var(--encre)}
 .hy-pied{font-size:12px;color:var(--encre-3);line-height:1.55;padding:0 16px 16px}
 
+/* ── Analyse financière et laboratoire ───────────────────────────── */
+.fin-defile{overflow-x:auto;margin:0 -4px;padding:0 4px}
+.fin-table{width:100%;min-width:520px;border-collapse:collapse;font-size:13px}
+.fin-table th,.fin-table td{border-bottom:1px solid var(--bord);padding:9px 10px;
+  text-align:right;vertical-align:top;font-variant-numeric:tabular-nums}
+.fin-table thead th{text-align:right;font-family:var(--titre);font-size:13.5px;
+  font-weight:800;color:var(--nuit);border-bottom:2px solid var(--bord);
+  padding-bottom:10px}
+.fin-table thead th span{display:block;font-family:var(--texte);font-size:11px;
+  font-weight:400;color:var(--encre-3);margin-top:2px;white-space:normal;max-width:15ch}
+.fin-table tbody th,.fin-table thead th:first-child{text-align:left;font-weight:600;
+  color:var(--encre-2)}
+.fin-table tbody th i{font-style:normal;font-size:11px;color:var(--encre-3)}
+.fin-table td{font-weight:700;color:var(--nuit)}
+.fin-central{background:var(--douce)}
+.fin-ecarts{display:grid;gap:12px;margin-top:16px}
+@media(min-width:640px){.fin-ecarts{grid-template-columns:1fr 1fr}}
+.fin-ecart{background:var(--douce);border-radius:11px;padding:12px 14px}
+.fin-ecart-titre{font-size:12.5px;font-weight:800;color:var(--nuit);margin-bottom:6px}
+.fin-ecart ul{list-style:none;font-size:12.5px;color:var(--encre-2);line-height:1.7}
+.fin-ecart b{color:var(--nuit)}
+.fin-lcoe{margin-top:16px;font-size:13.5px;color:var(--encre-2);line-height:1.6;
+  border-left:3px solid var(--or);padding-left:12px}
+.fin-hors{margin-top:14px;font-size:12.5px;color:var(--encre-3);line-height:1.6}
+.fin-hors ul{list-style:disc;margin-left:18px;margin-top:4px}
+.fin-params{margin-top:14px}
+.fin-params summary,.opt-contraintes summary{cursor:pointer;font-size:12.5px;
+  font-weight:700;color:var(--encre-2);list-style:none}
+.fin-params summary::-webkit-details-marker,
+.opt-contraintes summary::-webkit-details-marker{display:none}
+.fin-params summary::before,.opt-contraintes summary::before{content:'+ ';
+  color:var(--argile);font-weight:800}
+.fin-params[open] summary::before,.opt-contraintes[open] summary::before{content:'– '}
+.bloc .fin-params dl{display:block;margin-top:10px;font-size:12.5px}
+.fin-params dl>div{border-top:1px solid var(--bord);padding:8px 0;display:grid;
+  grid-template-columns:1fr auto}
+.fin-params dt{color:var(--encre-2);font-weight:700}
+.fin-params dd{margin:0;font-weight:800;color:var(--nuit);text-align:right}
+.fin-params dl p{grid-column:1/-1;color:var(--encre-3);margin-top:3px;line-height:1.5}
+
+/* ── Optimiseur ──────────────────────────────────────────────────── */
+.opt-objectifs{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+  gap:10px;margin-bottom:16px}
+.opt-critere{font-size:13px;color:var(--encre-2);line-height:1.6;background:var(--douce);
+  border-radius:11px;padding:12px 14px}
+.opt-configs{display:grid;gap:12px;margin-top:16px}
+@media(min-width:700px){.opt-configs{grid-template-columns:repeat(3,1fr)}}
+.opt-config{border:1.5px solid var(--bord);border-radius:14px;padding:15px}
+.opt-retenue{border-color:var(--argile);border-width:2px;padding:14px;
+  box-shadow:0 6px 18px rgba(200,74,33,.12)}
+.opt-lettre{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--argile)}
+.opt-kwc{font-family:var(--titre);font-size:28px;font-weight:800;color:var(--nuit);
+  line-height:1.1;margin:5px 0 10px}
+.opt-kwc span{font-size:14px;color:var(--encre-3)}
+.bloc .opt-config dl{display:block;font-size:12.5px}
+.opt-config dl>div{display:flex;justify-content:space-between;gap:10px;padding:4px 0;
+  border-top:1px solid var(--bord)}
+.opt-config dt{color:var(--encre-3)}
+.opt-config dd{margin:0;font-weight:800;color:var(--nuit);text-align:right;
+  font-variant-numeric:tabular-nums}
+.opt-phrase{margin-top:16px;font-size:13.5px;color:var(--nuit);line-height:1.6;
+  background:#fdf1e4;border-radius:11px;padding:12px 14px}
+.opt-contraintes{margin-top:12px}
+.opt-contraintes ul{list-style:disc;margin:8px 0 0 18px;font-size:12.5px;
+  color:var(--encre-2);line-height:1.65}
+
+/* ── Laboratoire ─────────────────────────────────────────────────── */
+.lab-medailles{display:grid;gap:10px;margin-top:16px}
+@media(min-width:640px){.lab-medailles{grid-template-columns:repeat(2,1fr)}}
+.lab-medaille{background:var(--douce);border-radius:11px;padding:12px 14px}
+.lab-titre{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--argile)}
+.lab-gagnant{font-family:var(--titre);font-size:16px;font-weight:800;color:var(--nuit);
+  margin-top:3px}
+.lab-critere{font-size:12px;color:var(--encre-3);margin-top:2px;line-height:1.45}
+.lab-non{margin-top:14px;font-size:12.5px;color:var(--encre-2);line-height:1.6}
+.lab-non ul{list-style:disc;margin:6px 0 0 18px}
+.lab-non-txt{color:var(--encre-3);margin-top:8px}
+
+/* ── Assistant ───────────────────────────────────────────────────── */
+.bloc-copilote{border-color:var(--nuit-3)}
+.copi-modes{display:inline-flex;gap:0;border:1.5px solid var(--bord);border-radius:99px;
+  padding:3px;margin-bottom:14px}
+.copi-mode{border:none;background:none;font:inherit;font-size:12.5px;font-weight:700;
+  color:var(--encre-2);padding:6px 15px;border-radius:99px;cursor:pointer}
+.copi-mode.choisi{background:var(--nuit);color:#fff}
+.copi-reponse{min-height:64px;margin-bottom:14px}
+.copi-vide{font-size:13.5px;color:var(--encre-3);line-height:1.6}
+.copi-question{font-size:13px;font-weight:800;color:var(--argile);margin-bottom:8px}
+.copi-bulle{background:var(--douce);border-radius:14px;padding:14px 16px;font-size:14px;
+  color:var(--encre);line-height:1.65}
+.copi-bulle p+p{margin-top:10px}
+.copi-refus{background:#fdf1e4}
+.copi-manque{font-size:12px;color:#8a5a1c;font-weight:700}
+.copi-props{list-style:disc;margin:8px 0 0 18px;font-size:12.5px;color:var(--encre-2)}
+.copi-sugg{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.copi-q{border:1.5px solid var(--bord);background:var(--surface);border-radius:99px;
+  padding:8px 14px;font:inherit;font-size:12.5px;font-weight:600;color:var(--encre-2);
+  cursor:pointer;text-align:left}
+.copi-q:hover{border-color:var(--or);color:var(--nuit)}
+.copi-champ{display:flex;gap:9px;flex-wrap:wrap}
+.copi-champ input{flex:1 1 200px;min-width:0;padding:12px 14px;font-size:15px;
+  border:1.5px solid var(--bord);border-radius:11px;background:var(--surface);
+  color:var(--encre);font-family:inherit}
+.copi-champ input:focus{outline:none;border-color:var(--argile)}
+.copi-champ .btn{flex:0 0 auto}
+
 /* Le squelette de chargement. */
 .squelette{display:flex;flex-direction:column;gap:10px;padding:6px 0}
 .squelette span{height:13px;border-radius:7px;
