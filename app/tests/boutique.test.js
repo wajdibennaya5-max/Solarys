@@ -7,7 +7,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { OFFRES, ORDRE, CONTACT, estOuverte, estVendable, boutiqueOuverte } from '../js/boutique.js';
+import { createHash } from 'node:crypto';
+import { OFFRES, ORDRE, CONTACT, PAIEMENT, estOuverte, estVendable, boutiqueOuverte } from '../js/boutique.js';
 import { PLANS, makeKey, readKey } from '../js/licence.js';
 
 const formulesConnues = Object.values(PLANS).map((p) => p.id);
@@ -170,10 +171,12 @@ test('sans coordonnées de règlement, aucun moyen n\'est annoncé', async () =>
 test('une adresse USDT est annoncée avec son réseau', async () => {
   // Le réseau compte autant que l'adresse : un envoi sur le mauvais réseau
   // est perdu, et l'acheteur doit le lire avant d'envoyer.
-  const m = await avecPaiement({ usdt: { adresse: 'TXyz000', reseau: 'TRC20' } });
+  const m = await avecPaiement({ usdt: { adresse: 'TXyz000', reseau: 'TRON (TRC20)' } });
   const [ligne] = m.moyensDePaiement();
   assert.match(ligne, /TXyz000/);
-  assert.match(ligne, /TRC20/);
+  assert.match(ligne, /TRON \(TRC20\)/);
+  // Le libellé doit rester lisible, sans parenthèses imbriquées.
+  assert.doesNotMatch(ligne, /\([^)]*\([^)]*\)/);
 });
 
 test('une adresse sans réseau reste annoncée, sans mention trompeuse', async () => {
@@ -199,16 +202,77 @@ test('les moyens connus figurent dans le message de commande', async () => {
 });
 
 test('sans moyen connu, la commande demande encore comment régler', async () => {
+  // Cet état existe toujours — un vendeur qui n'a pas encore de moyen à
+  // annoncer —, même si le fichier livré en publie un désormais. On le
+  // reconstitue explicitement plutôt que de dépendre de la configuration.
   const m = await import(`../js/boutique.js?commande=${Math.random()}`);
   m.COMMANDE.whatsapp = '21612345678';
+  m.PAIEMENT.usdt = { adresse: '', reseau: '' };
+  m.PAIEMENT.virement = '';
+  m.PAIEMENT.autre = '';
   const texte = decodeURIComponent(
     new URL(m.lienAchat('perpetual', 'Licence perpétuelle')).searchParams.get('text'));
   assert.match(texte, /indiquer comment régler/);
 });
 
-test('les coordonnées de règlement restent une décision explicite', async () => {
-  // Vides dans le fichier livré : elles ne se publient pas par accident.
+test('les coordonnées de règlement gardent une forme exploitable', async () => {
   const { PAIEMENT } = await import('../js/boutique.js');
   assert.equal(typeof PAIEMENT.usdt.adresse, 'string');
+  assert.equal(typeof PAIEMENT.usdt.reseau, 'string');
   assert.equal(typeof PAIEMENT.virement, 'string');
+});
+
+/* ------------------------------------------------------------------ */
+/* L'adresse publiée — une faute de frappe coûte l'argent d'un client  */
+/* ------------------------------------------------------------------ */
+
+// Une adresse TRON porte sa propre somme de contrôle. La vérifier ici coûte
+// vingt lignes ; ne pas la vérifier coûte un virement perdu sans recours, et
+// un client qui a payé dans le vide.
+const BASE58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+/** Décode une adresse base58 en ses 25 octets, ou `null` si elle n'en est pas une. */
+function base58Decode(texte) {
+  let n = 0n;
+  for (const c of texte) {
+    const i = BASE58.indexOf(c);
+    if (i < 0) return null; // caractère hors alphabet — 0, O, I et l en sont exclus
+    n = n * 58n + BigInt(i);
+  }
+  const out = new Uint8Array(25);
+  for (let i = 24; i >= 0; i--) { out[i] = Number(n & 0xffn); n >>= 8n; }
+  return n === 0n ? out : null; // ce qui déborde de 25 octets n'est pas une adresse
+}
+
+const sha256 = (o) => createHash('sha256').update(o).digest();
+
+test('l\'adresse USDT publiée est une adresse TRON valide', () => {
+  const { adresse } = PAIEMENT.usdt;
+  if (!adresse) return; // rien de publié : rien à vérifier
+
+  assert.equal(adresse.length, 34, 'une adresse TRON compte 34 caractères');
+  const brut = base58Decode(adresse);
+  assert.ok(brut, 'adresse illisible en base58 — un caractère est erroné');
+  assert.equal(brut[0], 0x41, 'préfixe 0x41 attendu : réseau principal TRON');
+
+  const somme = Buffer.from(brut.subarray(21));
+  const attendue = sha256(sha256(brut.subarray(0, 21))).subarray(0, 4);
+  assert.ok(somme.equals(attendue),
+    'somme de contrôle fausse — l\'adresse est mal recopiée, ne pas l\'encaisser');
+});
+
+test('une adresse dont un caractère change est rejetée', () => {
+  // Contre-épreuve : sans elle, le test précédent pourrait ne rien vérifier.
+  const faussee = 'TBp9gdAeYdsiFvg7vKGoq2cM5TohLgbADC'; // dernier caractère modifié
+  const brut = base58Decode(faussee);
+  const rejetee = !brut
+    || !Buffer.from(brut.subarray(21)).equals(sha256(sha256(brut.subarray(0, 21))).subarray(0, 4));
+  assert.ok(rejetee, 'une adresse corrompue doit être détectée');
+});
+
+test('un réseau est toujours annoncé avec une adresse', () => {
+  // Un USDT envoyé sur un réseau que l'adresse ne dessert pas est perdu.
+  if (PAIEMENT.usdt.adresse) {
+    assert.ok(PAIEMENT.usdt.reseau, 'adresse publiée sans réseau : envoi à l\'aveugle');
+  }
 });

@@ -88,7 +88,7 @@ export const COMMANDE = {
  * décision explicite de leur propriétaire.
  */
 export const PAIEMENT = {
-  usdt: { adresse: '', reseau: '' },
+  usdt: { adresse: 'TBp9gdAeYdsiFvg7vKGoq2cM5TohLgbADB', reseau: 'TRON (TRC20)' },
   virement: '',
   autre: '',
 };
@@ -101,7 +101,9 @@ export function moyensDePaiement() {
   const out = [];
   const { adresse, reseau } = PAIEMENT.usdt ?? {};
   if (adresse) {
-    out.push(`USDT${reseau ? ` (réseau ${reseau})` : ''} : ${adresse}`);
+    // Le nom du réseau est repris tel que le portefeuille l'affiche : c'est
+    // celui que l'acheteur devra sélectionner chez lui avant d'envoyer.
+    out.push(`USDT${reseau ? `, réseau ${reseau}` : ''} : ${adresse}`);
   }
   if (PAIEMENT.virement) out.push(`Virement : ${PAIEMENT.virement}`);
   if (PAIEMENT.autre) out.push(PAIEMENT.autre);
