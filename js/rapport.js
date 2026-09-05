@@ -15,7 +15,7 @@
  * on le demande : graphiques en SVG inline, chiffres en texte. Une page qui
  * dépend d'un script pour s'imprimer sort blanche une fois sur trois.
  */
-import { formater, formaterRond } from './prix.js';
+import { formater, formaterRond, echapper } from './prix.js';
 import { formater as formaterCo2, enArbres } from './co2.js';
 import { typeBatiment } from './batiment.js';
 import { nomGouvernorat, zoneSolaire, MOIS } from './gisement.js';
@@ -296,15 +296,4 @@ function orientationEnClair({ pente, orientation } = {}) {
   if (!pente) return '—';
   if (pente === 'plat') return 'toiture-terrasse — modules sur châssis inclinés au sud';
   return `${orientation ?? 'sud'}, pente ${pente}`;
-}
-
-/**
- * Le nom du client vient d'un champ de saisie : il ne doit jamais pouvoir
- * refermer une balise. Ce rapport finit imprimé, envoyé, archivé — pas
- * question qu'un chevron y ouvre quoi que ce soit.
- */
-export function echapper(texte) {
-  return String(texte ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }

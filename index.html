@@ -5,6 +5,22 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Solarys — Étude photovoltaïque gratuite en Tunisie</title>
 <meta name="description" content="Estimez en deux minutes ce que le solaire vous ferait économiser, à partir de votre vraie facture STEG. Gratuit, sans compte, sans engagement.">
+<!-- POLITIQUE DE SÉCURITÉ DE CONTENU.
+     `script-src 'self'` sans `unsafe-inline` : même si une valeur saisie
+     parvenait à s'insérer dans la page, aucun script n'en sortirait. C'est ce
+     qui a fait retirer le dernier gestionnaire `onload` en ligne du document.
+     `style-src` garde `unsafe-inline` : la feuille de style est écrite dans
+     la page, et l'y interdire demanderait un condensat par règle.
+     `connect-src` n'autorise que le serveur d'étude ; `object-src` et
+     `base-uri` sont fermés.
+     `frame-ancestors` n'est PAS pris en compte dans une balise meta : la
+     protection contre le cadrage demande un en-tête serveur, que GitHub
+     Pages ne permet pas de définir. C'est écrit dans docs/SECURITE.md. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none';
+  script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src https://fonts.gstatic.com; img-src 'self' data:;
+  connect-src 'self' https://20122011.xyz; form-action 'self'; base-uri 'none';
+  object-src 'none'; manifest-src 'self'">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,7 +32,7 @@
      `media="print"` la fait charger sans bloquer ; `onload` la rend active
      dès son arrivée. La page s'affiche aussitôt dans les polices système,
      puis bascule. -->
-<link rel="stylesheet" media="print" onload="this.media='all';this.onload=null"
+<link rel="stylesheet" media="print" data-polices
   href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Source+Sans+3:wght@400;600;700&display=swap">
 <noscript><link rel="stylesheet"
   href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Source+Sans+3:wght@400;600;700&display=swap"></noscript>
@@ -778,6 +794,25 @@ details[open]>summary .hy-titre::before{content:'– '}
 .copi-champ input:focus{outline:none;border-color:var(--argile)}
 .copi-champ .btn{flex:0 0 auto}
 
+/* ── Diagnostic et erreur globale ────────────────────────────────── */
+.erreur-globale{position:sticky;top:0;z-index:60;margin:0;padding:12px 18px;
+  background:#fbe6e1;color:#7a2a12;font-size:14px;font-weight:700;text-align:center;
+  border-bottom:1px solid #e9c4b8}
+.diagnostic{margin-top:24px;border:1px solid var(--bord);border-radius:12px;
+  background:var(--fond);padding:0}
+.diagnostic summary{cursor:pointer;padding:12px 15px;font-size:12.5px;font-weight:700;
+  color:var(--encre-3);list-style:none}
+.diagnostic summary::-webkit-details-marker{display:none}
+.diagnostic summary::before{content:'+ ';color:var(--argile);font-weight:800}
+.diagnostic[open] summary::before{content:'– '}
+.diag-txt{font-size:12.5px;color:var(--encre-2);line-height:1.6;padding:0 15px}
+.diag-id{font-size:12.5px;color:var(--encre-2);padding:8px 15px 0}
+.diag-id b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--nuit)}
+.diag-journal{margin:10px 15px;padding:11px;background:var(--douce);border-radius:9px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.5;
+  color:var(--encre-2);max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.diagnostic .btn{margin:0 15px 15px;font-size:13px;padding:9px 16px}
+
 /* Le squelette de chargement. */
 .squelette{display:flex;flex-direction:column;gap:10px;padding:6px 0}
 .squelette span{height:13px;border-radius:7px;
@@ -906,6 +941,8 @@ footer .bas{margin-top:36px;padding-top:20px;border-top:1px solid rgba(255,255,2
     </nav>
   </div>
 </header>
+
+<p class="erreur-globale" id="erreurGlobale" role="alert" hidden></p>
 
 <main id="haut">
 

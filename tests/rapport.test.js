@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { construireRapport, conclusion, dateDuJour, echapper, SECTIONS }
-  from '../js/rapport.js';
+import { construireRapport, conclusion, dateDuJour, SECTIONS } from '../js/rapport.js';
+import { echapper } from '../js/prix.js';
 import { etudier, HYPOTHESES } from '../js/etude.js';
 import { evaluer } from '../js/score.js';
 import { dimensionner, nombreDeModules } from '../js/technique.js';

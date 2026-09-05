@@ -7,7 +7,7 @@
  */
 import { GOUVERNORATS, nomGouvernorat, zoneSolaire } from './gisement.js';
 import { HYPOTHESES, PUISSANCE } from './etude.js';
-import { formater, formaterRond } from './prix.js';
+import { formater, formaterRond, echapper } from './prix.js';
 import { localiser, REFUS } from './geo.js';
 import { planCalepinage } from './calepinage.js';
 import { ORIENTATIONS, PENTES, expliquerOrientation } from './orientation.js';
@@ -31,6 +31,8 @@ import { repondre as repondreCopilote, suggestions as suggestionsCopilote, MODES
   from './copilote.js';
 import { panneauFinancier, panneauOptimiseur, panneauLaboratoire, panneauCopilote,
   reponseCopilote } from './tableau.js';
+import { noter, proteger, surveiller, resume as resumeJournal, enTexte, CORRELATION }
+  from './journal.js';
 import { dimensionner, verdictGlobal } from './technique.js';
 import { construireRapport } from './rapport.js';
 import { reponses, simulation, reinitialiserSimulation, cotesToit, reglagePose,
@@ -1063,6 +1065,17 @@ function dessinerResultat() {
       <div class="rapport-boite" id="rapportBoite" hidden></div>
     </div>
 
+    <details class="diagnostic" id="blocDiagnostic">
+      <summary>Diagnostic technique</summary>
+      <p class="diag-txt">Si une partie de cette page ne s’affiche pas correctement,
+        copiez ces informations et joignez-les à votre message. Elles ne contiennent
+        ni votre nom, ni votre téléphone, ni votre courriel : les champs de contact
+        sont expurgés avant d’être écrits.</p>
+      <p class="diag-id">Session <b id="diagId"></b></p>
+      <pre class="diag-journal" id="diagJournal"></pre>
+      <button class="btn" type="button" id="copierJournal">Copier le diagnostic</button>
+    </details>
+
     <p style="text-align:center;margin-top:26px">
       <button class="btn" type="button" id="recommencer">Refaire une estimation</button></p>`;
 
@@ -1125,8 +1138,9 @@ function dessinerResultat() {
   $('resultat').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   brancherRapport();
-  brancherOptimiseur();
-  brancherCopilote();
+  proteger('optimiseur', () => brancherOptimiseur());
+  proteger('assistant', () => brancherCopilote());
+  brancherDiagnostic();
 
   $('recommencer').addEventListener('click', () => {
     etape = 0;
@@ -1256,6 +1270,36 @@ function dessinerLaboratoire(e) {
     comparerVariantes(d, variantesProposees(d, { puissanceCourante: e.puissance })));
 }
 
+/** Le journal, consultable et copiable par le visiteur qui signale une panne. */
+function brancherDiagnostic() {
+  const bloc = $('blocDiagnostic');
+  if (!bloc) return;
+  $('diagId').textContent = CORRELATION;
+  const remplir = () => {
+    const r = resumeJournal();
+    $('diagJournal').textContent = `${r.total} entrées — ${r.erreur} erreur(s), `
+      + `${r.avertissement} avertissement(s)\n\n${enTexte()}`;
+  };
+  bloc.addEventListener('toggle', () => { if (bloc.open) remplir(); });
+  $('copierJournal')?.addEventListener('click', async () => {
+    remplir();
+    const bouton = $('copierJournal');
+    try {
+      await navigator.clipboard.writeText($('diagJournal').textContent);
+      bouton.textContent = 'Copié';
+    } catch {
+      // Le presse-papiers peut être refusé : on sélectionne le texte pour
+      // que le visiteur le copie lui-même, plutôt que de ne rien faire.
+      const plage = document.createRange();
+      plage.selectNodeContents($('diagJournal'));
+      const sel = getSelection();
+      sel.removeAllRanges(); sel.addRange(plage);
+      bouton.textContent = 'Sélectionné — copiez avec votre clavier';
+    }
+    setTimeout(() => { bouton.textContent = 'Copier le diagnostic'; }, 3000);
+  });
+}
+
 /** Le choix d'objectif redessine l'optimiseur, et lui seul. */
 function brancherOptimiseur() {
   const hote = $('zoneOptimiseur');
@@ -1282,8 +1326,10 @@ function brancherCopilote() {
   const poser = (question) => {
     if (!question) return;
     const r = repondreCopilote(question, simulationCourante, modeCopilote);
+    // La question vient d'un champ libre : elle est échappée entièrement,
+    // pas seulement sur le chevron ouvrant.
     $('copiReponse').innerHTML = `<p class="copi-question">« ${
-      question.replace(/</g, '&lt;')} »</p>` + reponseCopilote(r);
+      echapper(question)} »</p>` + reponseCopilote(r);
   };
 
   hote.addEventListener('click', (ev) => {
@@ -1423,8 +1469,9 @@ function rafraichir() {
 
   // LE MOTEUR passe une fois par rafraîchissement, et alimente tout ce qui
   // explique l'étude : niveau, confiance, alertes, traçabilité, hypothèses.
-  simulationCourante = simuler({ ...(source ?? {}),
-    moduleId: reglagePose().module.id }, { puissance: simulation.puissance });
+  simulationCourante = proteger('moteur de simulation', () => simuler({
+    ...(source ?? {}), moduleId: reglagePose().module.id },
+  { puissance: simulation.puissance }), null);
   const ouverts = new Set([...document.querySelectorAll('#resultat details[open]')]
     .map((d) => d.id).filter(Boolean));
   $('bandeauNiveau').innerHTML = bandeauNiveau(simulationCourante);
@@ -1434,9 +1481,12 @@ function rafraichir() {
   // Un panneau qu'on lisait ne doit pas se refermer parce qu'un curseur a bougé.
   for (const id of ouverts) { const d = $(id); if (d) d.open = true; }
 
-  dessinerFinancier(e);
-  dessinerOptimiseur();
-  dessinerLaboratoire(e);
+  // CHAQUE PANNEAU SECONDAIRE EST PROTÉGÉ SÉPARÉMENT. Une exception dans
+  // l'analyse financière ne doit pas emporter la puissance recommandée et
+  // les économies, qui sont ce que le visiteur est venu chercher.
+  proteger('analyse financière', () => dessinerFinancier(e));
+  proteger('optimiseur', () => dessinerOptimiseur());
+  proteger('laboratoire', () => dessinerLaboratoire(e));
 
   $('avertissement').innerHTML = avertissement(e, HYPOTHESES);
 
@@ -1528,7 +1578,7 @@ function dessinerDemande(etude) {
         border-radius:14px;padding:22px">
         <div style="font-size:19px;font-weight:800;color:#fff">Demande enregistrée</div>
         <p style="color:rgba(255,255,255,.8);margin-top:8px">Votre référence :
-          <b style="color:var(--or)">${r.reference}</b>. Nous vous rappelons
+          <b style="color:var(--or)">${echapper(r.reference)}</b>. Nous vous rappelons
           rapidement${client.courriel ? ', et votre étude part par courriel' : ''}.</p>
         <p style="margin-top:16px"><a class="btn" href="${lienDemande(
           redigerDemande({ etude, client, gouvernorat: lieu, payante: false }))}"
@@ -1560,6 +1610,9 @@ $('form').addEventListener('submit', (ev) => {
   if (souci) { $('erreur').textContent = souci; return; }
 
   reponses[e.cle] = valeur;
+  // On journalise la clé de l'étape, jamais sa valeur : celle-ci peut
+  // contenir des chiffres de facture, et le journal n'a pas à les connaître.
+  noter('info', 'étape validée', { etape, cle: e.cle });
   if (etape < ETAPES.length - 1) { etape++; memoriser(); dessinerEtape(); }
   else { memoriser(true); dessinerResultat(); }
 });
@@ -1658,7 +1711,26 @@ function brancherVitre() {
   relancer();
 }
 
-brancherVitre();
+// La surveillance des erreurs est branchée AVANT tout le reste : une panne
+// au démarrage est celle qu'on a le plus besoin de voir.
+/**
+ * La feuille de polices est chargée en `media="print"` pour ne pas bloquer le
+ * premier rendu ; c'est ici qu'on l'active. Le faire en JavaScript plutôt
+ * qu'avec un attribut `onload` permet d'interdire tout script en ligne dans
+ * la politique de sécurité de contenu.
+ */
+for (const lien of document.querySelectorAll('link[data-polices]')) {
+  if (lien.media === 'print') lien.media = 'all';
+}
+
+surveiller((message) => {
+  const zone = $('erreurGlobale');
+  if (!zone) return;
+  zone.hidden = false;
+  zone.textContent = message;
+});
+
+proteger('accueil', () => brancherVitre());
 
 $('annee').textContent = new Date().getFullYear();
 dessinerEtape();

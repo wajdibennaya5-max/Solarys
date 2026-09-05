@@ -36,3 +36,18 @@ export function formater(dinars, { devise = true, langue = 'fr', decimales = 3 }
 /** Un montant arrondi au dinar, pour les grands nombres d'une étude. */
 export const formaterRond = (dinars, opts = {}) =>
   formater(Math.round(Number(dinars || 0)), { ...opts, decimales: 0 });
+
+/**
+ * ÉCHAPPE UN TEXTE AVANT DE L'INSÉRER DANS DU HTML.
+ *
+ * Le seul rempart d'un site sans serveur contre l'injection : tout ce qui
+ * vient d'une saisie, d'une URL ou d'une réponse réseau passe par ici avant
+ * de toucher `innerHTML`. Échapper le seul `<` suffit à empêcher d'ouvrir une
+ * balise, mais laisse passer des entités cassées et des attributs rompus —
+ * autant tout échapper, cela ne coûte rien.
+ */
+export function echapper(texte) {
+  return String(texte ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
