@@ -6,7 +6,7 @@
  * c'est ce qu'elle doit faire — aucune requête, aucun mouchard.
  */
 import { GOUVERNORATS, nomGouvernorat, zoneSolaire } from './gisement.js';
-import { etudier, HYPOTHESES, PUISSANCE } from './etude.js';
+import { HYPOTHESES, PUISSANCE } from './etude.js';
 import { formater, formaterRond } from './prix.js';
 import { localiser, REFUS } from './geo.js';
 import { planCalepinage } from './calepinage.js';
@@ -23,6 +23,8 @@ import { carteCentrale, grilleKpi, carteScore, avertissement, phraseCo2,
   panneauTechnique } from './tableau.js';
 import { dimensionner, verdictGlobal } from './technique.js';
 import { construireRapport } from './rapport.js';
+import { reponses, simulation, reinitialiserSimulation, cotesToit, reglagePose,
+  donneesEtude, etudeCourante, scenariosCourants } from './etat.js';
 import { evaluer } from './score.js';
 import { animerChiffres, compter, mouvementReduit } from './anime.js';
 import { tousLesCas, DUREE as DUREE_VITRE } from './heros.js';
@@ -31,10 +33,9 @@ import { construireGraphe, grapheMensuel, grapheComparaison, diagrammeFlux }
 import { OFFRE, CONTACT, ouverte, redigerDemande, lienDemande, champsManquants,
   envoyerAuServeur, API } from './prospect.js';
 import { enregistrer, relire, effacer, ageEnClair } from './session.js';
-import { comparer, scenarioParDefaut, ecart } from './scenarios.js';
+import { scenarioParDefaut, ecart } from './scenarios.js';
 
 const $ = (id) => document.getElementById(id);
-const reponses = {};
 
 /**
  * LE SCHÉMA DE LA FACTURE — dessiné, pas photographié.
@@ -840,59 +841,8 @@ function chiffre(valeur, libelle, fort = false) {
     <span class="v">${valeur}</span><span class="l">${libelle}</span></div>`;
 }
 
-/** L'état de la simulation : ce que le visiteur a déplacé lui-même. */
-let simulation = { puissance: null, surface: 0 };
-
 /** Le dernier contact saisi, pour le porter en couverture du rapport. */
 let dernierClient = null;
-
-/**
- * Les données du foyer, telles que le calcul les attend.
- *
- * Un seul endroit où elles se composent : l'étude affichée et les trois
- * scénarios comparés doivent reposer exactement sur les mêmes chiffres, sans
- * quoi la comparaison ne voudrait rien dire.
- */
-function donneesEtude() {
-  const toit = reponses.toit ?? {};
-  const c = reponses.consommation ?? {};
-  const annuel = resoudre(c.methode, c.saisie ?? {});
-  if (!annuel) return null;
-  return {
-    consommationAnnuelle: annuel.consommationAnnuelle,
-    montantAnnuel: annuel.montantAnnuel,
-    fiabilite: annuel.fiabilite,
-    detailConso: annuel.detail,
-    gouvernorat: reponses.gouvernorat,
-    surfaceDisponible: simulation.surface,
-    orientation: toit.orientation ?? null,
-    pente: toit.pente ?? null,
-    batiment: reponses.batiment ?? TYPE_DEFAUT,
-  };
-}
-
-/** Les cotes du pan, quand le visiteur les a données. */
-function cotesToit() {
-  const t = reponses.toit ?? {};
-  return { L: Number(t.L) || 0, P: Number(t.P) || 0 };
-}
-
-/** Le module et la pose retenus à l'étape Installation. */
-function reglagePose() {
-  const i = reponses.installation ?? {};
-  return { module: moduleParId(i.module), pose: i.pose ?? 'auto' };
-}
-
-/** Recalcule l'étude avec les réglages courants. */
-function etudeCourante() {
-  const d = donneesEtude();
-  if (!d) return null;
-  // Le module retenu à l'étape Installation décide du nombre de modules :
-  // sans lui, l'étude compterait en 550 Wc pendant que le dimensionnement
-  // électrique compterait en 450.
-  return etudier({ ...d, puissance: simulation.puissance,
-    moduleWc: reglagePose().module.puissance });
-}
 
 /**
  * Les trois scénarios, et celui qui est retenu à l'écran.
@@ -905,8 +855,7 @@ function dessinerScenarios() {
   const hote = $('scenarios');
   const bloc = $('blocScenarios');
   if (!hote || !bloc) return;
-  const d = donneesEtude();
-  const trio = d ? comparer({ ...d, moduleWc: reglagePose().module.puissance }) : [];
+  const trio = scenariosCourants();
 
   // Un seul scénario possible — toit trop petit — n'est pas un choix : le
   // bloc disparaît plutôt que d'afficher une comparaison à un terme.
@@ -947,7 +896,7 @@ function dessinerScenarios() {
 
 function dessinerResultat() {
   const toit = cotesToit();
-  simulation = { puissance: null, surface: (toit.L || 0) * (toit.P || 0), sienne: false };
+  reinitialiserSimulation();
   const e = etudeCourante();
 
   // Une étude incomplète ne s'affiche pas à moitié.
