@@ -1,0 +1,12 @@
+{
+  "name": "boutique",
+  "version": "0.1.0",
+  "description": "Boutique en ligne — Tunisie. Commande par WhatsApp, paiement à la livraison.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "start": "python3 -m http.server 8080"
+  },
+  "license": "UNLICENSED"
+}
