@@ -9,6 +9,7 @@ import { GOUVERNORATS, nomGouvernorat, zoneSolaire } from './gisement.js';
 import { etudier, HYPOTHESES, PUISSANCE } from './etude.js';
 import { formater, formaterRond } from './prix.js';
 import { localiser, REFUS } from './geo.js';
+import { planCalepinage } from './calepinage.js';
 import { construireGraphe } from './graphe.js';
 import { OFFRE, CONTACT, ouverte, redigerDemande, lienDemande, champsManquants }
   from './prospect.js';
@@ -89,17 +90,30 @@ const ETAPES = [
     },
   },
   {
-    cle: 'surface',
-    titre: 'Quelle surface de toiture est disponible ?',
-    aide: 'Facultatif. Sans réponse, on suppose que la place ne manque pas.',
+    cle: 'toiture',
+    titre: 'Quelles sont les cotes de votre toiture ?',
+    aide: 'Facultatif — mais c’est ce qui permet de placer les panneaux sur VOTRE toit.',
     champ: () => `<div class="champ">
-      <label for="surface">Surface exploitable (m²) — facultatif</label>
-      <input id="surface" name="surface" type="number" inputmode="numeric"
-        min="0" max="2000" step="1" placeholder="Laissez vide si vous ne savez pas">
-      <p class="indice">Comptez environ ${HYPOTHESES.surfaceParKwc} m² par kilowatt-crête,
-        hors zones ombragées.</p>
+      <label for="toitL">Largeur du pan (m)</label>
+      <input id="toitL" name="toitL" type="number" inputmode="decimal"
+        min="0" max="200" step="0.1" placeholder="8">
+    </div>
+    <div class="champ">
+      <label for="toitP">Profondeur du pan (m)</label>
+      <input id="toitP" name="toitP" type="number" inputmode="decimal"
+        min="0" max="200" step="0.1" placeholder="6">
+      <p class="indice">Le pan orienté au sud, ou celui qui reçoit le plus de
+        soleil. Laissez vide si vous ne les connaissez pas.</p>
     </div>`,
-    valide: () => null,
+    // Les deux cotes vont ensemble : une seule ne dessine aucun toit.
+    lire: () => ({ L: Number($('toitL')?.value) || 0, P: Number($('toitP')?.value) || 0 }),
+    valide: (v) => {
+      if (!v.L && !v.P) return null; // facultatif, et assumé comme tel
+      if (!v.L || !v.P) return 'Indiquez les deux cotes, ou laissez-les vides toutes les deux.';
+      if (v.L * v.P < 4) return 'Ce pan paraît trop petit pour porter des panneaux.';
+      return null;
+    },
+    restaure: (v) => { if ($('toitL')) { $('toitL').value = v.L || ''; $('toitP').value = v.P || ''; } },
   },
 ];
 
@@ -128,6 +142,9 @@ function dessinerEtape() {
   $('suivant').textContent = etape === ETAPES.length - 1 ? 'Voir mon étude' : 'Suivant';
   dessinerJauge();
 
+  // Une étape peut porter plusieurs champs : elle dit alors comment se
+  // restaurer, plutôt que de supposer un champ unique du nom de la clé.
+  if (e.restaure) e.restaure(reponses[e.cle] ?? {});
   const saisi = document.getElementById(e.cle);
   if (saisi) {
     if (reponses[e.cle] !== undefined) saisi.value = reponses[e.cle];
@@ -185,7 +202,8 @@ function etudeCourante() {
 }
 
 function dessinerResultat() {
-  simulation = { puissance: null, surface: Number(reponses.surface) || 0 };
+  const toit = reponses.toiture ?? {};
+  simulation = { puissance: null, surface: (toit.L || 0) * (toit.P || 0) };
   const e = etudeCourante();
 
   // Une étude incomplète ne s'affiche pas à moitié.
@@ -225,6 +243,12 @@ function dessinerResultat() {
         </div>
       </div>
       <p class="indice" id="noteSurface" style="margin-top:14px"></p>
+    </div>
+
+    <div class="bloc" id="blocToit" hidden>
+      <h4>Vos panneaux, sur votre toit</h4>
+      <p class="note" id="noteToit"></p>
+      <div class="graphe" id="planToit"></div>
     </div>
 
     <div class="bloc">
@@ -324,6 +348,20 @@ function rafraichir() {
         (simulation.surface / HYPOTHESES.surfaceParKwc).toFixed(1).replace('.', ',')} kWc.`
     : `Sans contrainte de toiture, comptez ${HYPOTHESES.surfaceParKwc} m² par kWc.`;
 
+  // Le plan du toit, quand le visiteur a donné ses cotes.
+  const toit = reponses.toiture ?? {};
+  const trace = (toit.L && toit.P) ? planCalepinage(toit.L, toit.P, { largeurPx: 560 }) : null;
+  $('blocToit').hidden = !trace;
+  if (trace) {
+    const c = trace.plan;
+    $('planToit').innerHTML = trace.svg;
+    $('noteToit').textContent = `Sur un pan de ${String(toit.L).replace('.', ',')} × `
+      + `${String(toit.P).replace('.', ',')} m, ${c.nombre} modules tiennent en `
+      + `${c.rangees} rangée${c.rangees > 1 ? 's' : ''} de ${c.colonnes}, posés en `
+      + `${c.orientation} — soit ${String(c.puissance).replace('.', ',')} kWc au maximum. `
+      + `Marges de rive et jeux entre modules compris.`;
+  }
+
   $('detail').innerHTML = [
     ['Ce que vous payez le kilowattheure', e.prixKwh.toFixed(3).replace('.', ',') + ' DT'],
     ['Production estimée', e.production.toLocaleString('fr-FR') + ' kWh / an'],
@@ -386,7 +424,7 @@ function dessinerDemande(etude) {
 $('form').addEventListener('submit', (ev) => {
   ev.preventDefault();
   const e = ETAPES[etape];
-  const valeur = document.getElementById(e.cle)?.value ?? '';
+  const valeur = e.lire ? e.lire() : (document.getElementById(e.cle)?.value ?? '');
   const souci = e.valide(valeur);
   if (souci) { $('erreur').textContent = souci; return; }
 
