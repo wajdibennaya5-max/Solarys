@@ -21,8 +21,22 @@ import { evite, eviteSurDuree } from './co2.js';
  * client, donc les seuls qui puissent vieillir mal.
  */
 export const HYPOTHESES = {
-  /** Coût installé, en dinars par kWc, pose et matériel compris. */
-  coutParKwc: 3000,
+  /**
+   * PART FIXE DU COÛT, en dinars, indépendante de la puissance.
+   *
+   * Coffret de protection, câblage principal, mise à la terre, déplacement et
+   * main-d'œuvre de base : tout cela se paie une fois, que l'installation
+   * fasse un kilowatt ou dix.
+   *
+   * Le coût était purement proportionnel, et cela faussait les petites
+   * installations dans le sens le plus trompeur : le moteur d'optimisation,
+   * cherchant le remboursement le plus rapide, proposait 1 kWc — parce qu'un
+   * kilowatt y coûtait exactement le dixième de dix kilowatts, ce qu'aucun
+   * installateur ne facturera jamais.
+   */
+  coutFixe: 1200,
+  /** Part proportionnelle du coût, en dinars par kWc : modules, onduleur, pose. */
+  coutParKwc: 2700,
   /**
    * Part autoconsommée d'une installation dimensionnée sur la consommation
    * annuelle (production ≈ consommation), sans batterie. C'est le point de
@@ -36,6 +50,17 @@ export const HYPOTHESES = {
   hausseElectricite: 0.06,
   /** Perte de rendement annuelle des modules. */
   degradation: 0.005,
+  /**
+   * Entretien annuel, en part de l'investissement.
+   *
+   * Il était absent, et c'est une omission qui flattait le projet : nettoyage,
+   * vérifications et remplacement d'onduleur amorti coûtent quelque chose
+   * chaque année. Sur une installation de 4 kWc, l'ignorer avançait le retour
+   * de six mois — un chiffre que l'installateur aurait démenti.
+   */
+  maintenanceAnnuelle: 0.01,
+  /** Inflation appliquée aux dépenses d'entretien. */
+  inflation: 0.05,
   /** Durée retenue pour l'économie cumulée. */
   duree: 25,
   /** Surface au sol nécessaire par kWc, en m². */
@@ -199,18 +224,24 @@ export function etudier({
   const economieAn1 = autoconsomme * prixKwh
     + surplus * prixKwh * hypotheses.valeurSurplus;
 
-  const cout = kwc * hypotheses.coutParKwc;
+  const cout = (hypotheses.coutFixe ?? 0) + kwc * hypotheses.coutParKwc;
 
-  // Économie cumulée : l'électricité renchérit, les modules s'usent.
+  // Économie cumulée : l'électricité renchérit, les modules s'usent, et
+  // l'entretien se paie chaque année. Ce dernier terme manquait : c'est le
+  // même modèle que `finances.js`, pour que les deux moteurs ne donnent
+  // jamais deux temps de retour différents sur la même page.
+  const entretienAn1 = cout * (hypotheses.maintenanceAnnuelle ?? 0);
   let cumul = 0;
   let retour = null;
   const annees = [];
   for (let an = 1; an <= hypotheses.duree; an++) {
-    const economie = economieAn1
+    const recette = economieAn1
       * (1 + hypotheses.hausseElectricite) ** (an - 1)
       * (1 - hypotheses.degradation) ** (an - 1);
+    const entretien = entretienAn1 * (1 + (hypotheses.inflation ?? 0)) ** (an - 1);
+    const economie = recette - entretien;
     cumul += economie;
-    annees.push({ an, economie, cumul });
+    annees.push({ an, economie, cumul, recette, entretien });
     if (retour === null && cumul >= cout) {
       // Interpolation dans l'année : « 6,4 ans » se comprend mieux que « 7 ».
       const manquant = cout - (cumul - economie);
@@ -241,8 +272,12 @@ export function etudier({
     co2SurDuree: eviteSurDuree(production, hypotheses.duree, hypotheses.degradation),
     autoconsomme: Math.round(autoconsomme),
     surplus: Math.round(surplus),
-    economieAnnuelle: economieAn1,
-    economieMensuelle: economieAn1 / 12,
+    /** Recette brute de la première année, avant entretien. */
+    recetteAnnuelle: economieAn1,
+    /** Économie nette de la première année, entretien déduit. */
+    economieAnnuelle: economieAn1 - entretienAn1,
+    economieMensuelle: (economieAn1 - entretienAn1) / 12,
+    entretienAnnuel: entretienAn1,
     cout,
     retour,
     economieTotale: cumul,

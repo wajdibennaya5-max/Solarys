@@ -162,7 +162,10 @@ export function niveauAtteint(entrees, contexte = {}) {
 export function hypothesesUtilisees(entrees, hypotheses = HYPOTHESES) {
   const bat = typeBatiment(entrees.batiment);
   const liste = [
-    { cle: 'coutParKwc', nom: 'Coût installé retenu', valeur: hypotheses.coutParKwc,
+    { cle: 'coutFixe', nom: 'Part fixe du coût', valeur: hypotheses.coutFixe ?? 0,
+      unite: 'DT', source: 'coffret, câblage, mise à la terre, déplacement',
+      verifiee: false },
+    { cle: 'coutParKwc', nom: 'Coût par kilowatt-crête', valeur: hypotheses.coutParKwc,
       unite: 'DT/kWc', source: 'ordre de grandeur du marché tunisien', verifiee: false },
     { cle: 'hausseElectricite', nom: 'Hausse annuelle du prix de l’électricité',
       valeur: hypotheses.hausseElectricite * 100, unite: '%/an',

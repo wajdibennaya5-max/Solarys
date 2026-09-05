@@ -99,7 +99,7 @@ test('la demande s\'écrit en français, sans point décimal ni fausse précisio
     assert.doesNotMatch(ligne, /\d\.\d/, `point décimal anglais dans : ${ligne}`);
   }
   assert.match(t, /0,250 DT\/kWh/);
-  assert.match(t, /7,4 ans/);
+  assert.match(t, new RegExp(`${ETUDE.retour.toFixed(1).replace('.', ',')} ans`));
   assert.doesNotMatch(t, /,000 DT/, 'aucun montant estimé au millime près');
 });
 

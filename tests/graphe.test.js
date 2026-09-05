@@ -72,7 +72,10 @@ test('la courbe monte, comme l\'économie cumulée', () => {
 
 test('le temps de retour est marqué et nommé', () => {
   const { svg } = construireGraphe(ETUDE);
-  assert.match(svg, /remboursé en 7,4 ans/);
+  // Le nombre se relit dans l'étude plutôt que d'être figé ici : affiner le
+  // modèle financier ne doit pas casser un test de graphique.
+  const attendu = ETUDE.retour.toFixed(1).replace('.', ',');
+  assert.match(svg, new RegExp(`remboursé en ${attendu} ans`));
   assert.match(svg, /investissement/);
 });
 
