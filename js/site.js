@@ -22,6 +22,7 @@ import { POSES, optimiser } from './calepinage.js';
 import { carteCentrale, grilleKpi, carteScore, avertissement, phraseCo2,
   panneauTechnique } from './tableau.js';
 import { dimensionner, verdictGlobal } from './technique.js';
+import { construireRapport } from './rapport.js';
 import { evaluer } from './score.js';
 import { animerChiffres, compter, mouvementReduit } from './anime.js';
 import { tousLesCas, DUREE as DUREE_VITRE } from './heros.js';
@@ -842,6 +843,9 @@ function chiffre(valeur, libelle, fort = false) {
 /** L'état de la simulation : ce que le visiteur a déplacé lui-même. */
 let simulation = { puissance: null, surface: 0 };
 
+/** Le dernier contact saisi, pour le porter en couverture du rapport. */
+let dernierClient = null;
+
 /**
  * Les données du foyer, telles que le calcul les attend.
  *
@@ -883,7 +887,11 @@ function reglagePose() {
 function etudeCourante() {
   const d = donneesEtude();
   if (!d) return null;
-  return etudier({ ...d, puissance: simulation.puissance });
+  // Le module retenu à l'étape Installation décide du nombre de modules :
+  // sans lui, l'étude compterait en 550 Wc pendant que le dimensionnement
+  // électrique compterait en 450.
+  return etudier({ ...d, puissance: simulation.puissance,
+    moduleWc: reglagePose().module.puissance });
 }
 
 /**
@@ -898,7 +906,7 @@ function dessinerScenarios() {
   const bloc = $('blocScenarios');
   if (!hote || !bloc) return;
   const d = donneesEtude();
-  const trio = d ? comparer(d) : [];
+  const trio = d ? comparer({ ...d, moduleWc: reglagePose().module.puissance }) : [];
 
   // Un seul scénario possible — toit trop petit — n'est pas un choix : le
   // bloc disparaît plutôt que d'afficher une comparaison à un terme.
@@ -1044,6 +1052,22 @@ function dessinerResultat() {
       <div id="demande"></div>
     </div>
 
+    <div class="bloc bloc-rapport">
+      <h4>Emportez votre étude</h4>
+      <p class="note">Le récapitulatif complet de cette simulation, mis en page :
+        vos chiffres, les graphiques, le plan de toiture et toutes les
+        hypothèses de calcul. À enregistrer en PDF, à imprimer, à faire lire à
+        un installateur.</p>
+      <div class="rapport-actes">
+        <button class="btn primaire" type="button" id="obtenirRapport">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6M9 11h3"/></svg>
+          Obtenir mon rapport</button>
+        <button class="btn" type="button" id="versEtude">
+          Demander une étude technique</button>
+      </div>
+      <div class="rapport-boite" id="rapportBoite" hidden></div>
+    </div>
+
     <p style="text-align:center;margin-top:26px">
       <button class="btn" type="button" id="recommencer">Refaire une estimation</button></p>`;
 
@@ -1105,12 +1129,76 @@ function dessinerResultat() {
   $('resultat').hidden = false;
   $('resultat').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
+  brancherRapport();
+
   $('recommencer').addEventListener('click', () => {
     etape = 0;
     $('resultat').hidden = true;
     $('form').hidden = false;
     dessinerEtape();
     $('tunnel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+/**
+ * LE RAPPORT — construit à la demande, jamais en avance.
+ *
+ * Le fabriquer au chargement du tableau de bord coûterait deux graphiques et
+ * un plan de toiture à chaque déplacement de curseur, pour un document que la
+ * plupart des visiteurs n'ouvriront pas. Il est donc bâti au clic, sur l'état
+ * exact du moment.
+ */
+function brancherRapport() {
+  const bouton = $('obtenirRapport');
+  if (!bouton) return;
+
+  bouton.addEventListener('click', () => {
+    const e = etudeCourante();
+    if (!e) return;
+    const boite = $('rapportBoite');
+    const pan = reponses.toit ?? {};
+    const source = donneesEtude();
+
+    boite.hidden = false;
+    boite.innerHTML = construireRapport({
+      etude: e,
+      source,
+      score: evaluer({
+        gouvernorat: reponses.gouvernorat,
+        orientation: pan.orientation ?? null,
+        pente: pan.pente ?? null,
+        surfaceDisponible: simulation.surface,
+        puissanceVisee: e.puissance,
+        tauxAutoconsommation: e.tauxAutoconsommation,
+        retour: e.retour,
+      }),
+      dimensionnement: dimensionner({
+        puissance: e.puissance, module: reglagePose().module }),
+      client: dernierClient,
+      toit: pan,
+      consoMensuelle: consommationMensuelle(e.consommation, e.batiment, source?.mois ?? null),
+      gouvernorat: reponses.gouvernorat,
+      hypotheses: HYPOTHESES,
+      reglagePose: reglagePose(),
+      offre: OFFRE,
+    }) + `<div class="rapport-actes rapport-actes-bas">
+      <button class="btn primaire" type="button" id="imprimerRapport">
+        Enregistrer en PDF ou imprimer</button>
+      <button class="btn" type="button" id="fermerRapport">Fermer</button>
+    </div>`;
+
+    $('imprimerRapport').addEventListener('click', () => window.print());
+    $('fermerRapport').addEventListener('click', () => {
+      boite.hidden = true;
+      boite.innerHTML = '';
+      bouton.focus();
+    });
+    boite.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  $('versEtude')?.addEventListener('click', () => {
+    $('demande')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('nom')?.focus({ preventScroll: true });
   });
 }
 
@@ -1290,6 +1378,7 @@ function dessinerDemande(etude) {
       telephone: $('telephone').value,
       courriel: $('courriel')?.value ?? '',
     };
+    dernierClient = client;
     const manque = champsManquants(client);
     if (manque.length) {
       $('erreurDemande').textContent = `Indiquez ${manque.join(' et ')}.`;

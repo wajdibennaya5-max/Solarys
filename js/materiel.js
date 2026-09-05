@@ -99,6 +99,8 @@ export const ONDULEURS = [
     chainesParMppt: 1, vMax: 600, vMpptMin: 90, vMpptMax: 500, iMpptMax: 15, iScMax: 20 },
   { id: 'ond-3', nom: '3 kW monophasé', puissance: 3, phases: 1, mppt: 2,
     chainesParMppt: 1, vMax: 600, vMpptMin: 90, vMpptMax: 520, iMpptMax: 15, iScMax: 20 },
+  { id: 'ond-4', nom: '4 kW monophasé', puissance: 4, phases: 1, mppt: 2,
+    chainesParMppt: 1, vMax: 600, vMpptMin: 90, vMpptMax: 520, iMpptMax: 15, iScMax: 20 },
   { id: 'ond-5', nom: '5 kW monophasé', puissance: 5, phases: 1, mppt: 2,
     chainesParMppt: 1, vMax: 600, vMpptMin: 90, vMpptMax: 520, iMpptMax: 15, iScMax: 20 },
   { id: 'ond-6', nom: '6 kW triphasé', puissance: 6, phases: 3, mppt: 2,

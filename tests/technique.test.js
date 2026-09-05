@@ -167,6 +167,7 @@ test('des données inexploitables ne rendent aucun dimensionnement', () => {
 
 test('le nombre de modules suit la puissance et le format', () => {
   assert.equal(nombreDeModules(5.5, MODULE_DEFAUT), 10);
+  assert.equal(nombreDeModules(4, MODULE_DEFAUT), 8, 'vers le haut, jamais vers le bas');
   assert.ok(nombreDeModules(5.5, MODULES.find((m) => m.id === 'mono-450')) > 10);
   assert.equal(nombreDeModules(0), 0);
 });

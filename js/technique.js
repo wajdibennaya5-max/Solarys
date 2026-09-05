@@ -42,11 +42,18 @@ export const MARGE_COURANT = 1.25;
  */
 export const RATIO = { bas: 0.95, haut: 1.35, plancher: 0.85, plafond: 1.50 };
 
-/** Combien de modules pour atteindre une puissance crête. */
+/**
+ * Combien de modules pour atteindre une puissance crête.
+ *
+ * Vers le HAUT, comme dans `etude.js` : les deux comptages doivent tomber sur
+ * le même nombre, sans quoi le rapport se contredit d'une page à l'autre. Et
+ * puisque la production annoncée est calculée sur la puissance visée, mieux
+ * vaut en installer un peu plus qu'un peu moins.
+ */
 export function nombreDeModules(puissanceKwc, mod = MODULE_DEFAUT) {
   const kwc = Number(puissanceKwc);
   if (!(kwc > 0) || !mod?.puissance) return 0;
-  return Math.max(1, Math.round((kwc * 1000) / mod.puissance));
+  return Math.max(1, Math.ceil((kwc * 1000) / mod.puissance));
 }
 
 /**

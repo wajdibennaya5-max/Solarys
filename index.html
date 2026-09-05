@@ -490,6 +490,72 @@ input:focus-visible,select:focus-visible{outline:none;border-color:var(--argile)
   font-variant-numeric:tabular-nums}
 .tq-note{font-size:12px;color:var(--encre-3);line-height:1.55;padding:0 16px 16px}
 
+/* ── Le rapport ──────────────────────────────────────────────────── */
+.bloc-rapport{border-color:var(--or)}
+.rapport-actes{display:flex;flex-wrap:wrap;gap:12px;margin-top:18px}
+.rapport-actes .btn{flex:1 1 200px}
+.rapport-boite{margin-top:24px;border-top:2px solid var(--bord);padding-top:22px}
+.rapport{background:#fff;color:#10262b;font-size:14px;line-height:1.6}
+.rp-couverture{border-bottom:3px solid var(--nuit);padding-bottom:22px;margin-bottom:26px}
+.rp-logo{margin-bottom:18px}
+.rp-sur{font-size:11.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--argile)}
+.rp-titre{font-family:var(--titre);font-size:27px;font-weight:800;color:var(--nuit);
+  margin:8px 0 20px;line-height:1.2}
+.rp-identite{max-width:460px}
+.rp-resume{margin-top:18px;background:var(--douce);border-radius:11px;padding:13px 15px;
+  font-size:14.5px;line-height:1.7}
+.rp-resume b{font-family:var(--titre);font-size:19px;color:var(--nuit)}
+.rp-section{margin-bottom:30px;break-inside:avoid}
+.rp-section h2{font-family:var(--titre);font-size:18px;font-weight:800;color:var(--nuit);
+  display:flex;align-items:baseline;gap:11px;padding-bottom:9px;margin-bottom:13px;
+  border-bottom:1.5px solid var(--bord)}
+.rp-num{font-size:13px;font-weight:800;color:var(--argile);letter-spacing:.06em}
+.rp-h3{font-family:var(--titre);font-size:14.5px;font-weight:800;color:var(--nuit);
+  margin:18px 0 8px}
+.rp-table{width:100%;border-collapse:collapse;font-size:13.5px}
+.rp-table th,.rp-table td{border-bottom:1px solid var(--bord);padding:8px 0;
+  text-align:left;vertical-align:top}
+.rp-table th{font-weight:600;color:var(--encre-2);width:54%}
+.rp-table td{font-weight:700;color:var(--nuit);text-align:right}
+.rp-lim{display:block;font-size:11.5px;font-weight:600;color:var(--encre-3);margin-top:2px}
+.rp-figure{margin:18px 0 4px;break-inside:avoid}
+.rp-figure svg{width:100%;height:auto;display:block}
+.rp-figure figcaption{font-size:12px;color:var(--encre-3);text-align:center;margin-top:6px}
+.rp-p{margin-top:14px;font-size:13.5px;line-height:1.65;color:var(--encre-2)}
+.rp-p.rp-fiab{background:var(--douce);border-radius:9px;padding:10px 13px}
+.rp-p.rp-avert{border-left:3px solid var(--or);padding-left:12px;color:var(--encre-2)}
+.rp-p.rp-conclusion{background:var(--douce);border-radius:11px;padding:15px 17px;
+  font-size:14px;color:var(--nuit)}
+.rp-etapes{margin:6px 0 0 18px;font-size:13.5px;line-height:1.7;color:var(--encre-2)}
+.rp-etapes li{margin-bottom:9px}
+.rp-etapes b{color:var(--nuit)}
+.rp-pied{border-top:1.5px solid var(--bord);padding-top:14px;font-size:11.5px;
+  color:var(--encre-3);line-height:1.6}
+.rp-controles th{font-weight:600}
+
+/* À l'impression, seul le rapport sort — et il sort entier.
+   Tout est déjà écrit dans le document : aucune page ne dépend d'un script
+   pour s'imprimer, sous peine de sortir blanche une fois sur trois. */
+@media print{
+  body{background:#fff}
+  /* CHAQUE SÉLECTEUR EST ANCRÉ. Écrits sans ancrage, `header` masquait la
+     couverture du rapport — qui est un <header> — et `section` masquait ses
+     neuf sections : le PDF sortait avec un titre et un pied de page, et rien
+     entre les deux. */
+  body>header,body>footer,.heros,main>section:not(#tunnel),
+  #tunnel>.wrap>*:not(#resultat),
+  #resultat>*:not(.bloc-rapport),.bloc-rapport>*:not(.rapport-boite),
+  .rapport-actes,#jauge,.sauvegarde,.reprise{display:none!important}
+  #tunnel,#resultat,.bloc-rapport,.rapport-boite{padding:0;margin:0;border:none;
+    background:#fff;box-shadow:none;max-width:none}
+  .rapport-boite{border-top:none}
+  .rapport{font-size:11pt}
+  .rp-section{page-break-inside:avoid}
+  .rp-couverture{page-break-after:always}
+  a[href]::after{content:''}
+}
+
 /* Le squelette de chargement. */
 .squelette{display:flex;flex-direction:column;gap:10px;padding:6px 0}
 .squelette span{height:13px;border-radius:7px;

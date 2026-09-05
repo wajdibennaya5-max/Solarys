@@ -167,7 +167,7 @@ export function puissanceRecommandee({
 export function etudier({
   consommationAnnuelle, montantAnnuel, gouvernorat, surfaceDisponible = 0,
   puissance = null, orientation = null, pente = null, hypotheses = HYPOTHESES,
-  batiment = TYPE_DEFAUT,
+  batiment = TYPE_DEFAUT, moduleWc = 550,
 }) {
   const prixKwh = prixDuKwh({ consommationAnnuelle, montantAnnuel });
   const rendement = productible(gouvernorat);
@@ -248,7 +248,28 @@ export function etudier({
     economieTotale: cumul,
     gainNet: cumul - cout,
     surface: Math.ceil(kwc * hypotheses.surfaceParKwc),
-    modules: Math.ceil(kwc / 0.55), // modules de 550 Wc, courants en Tunisie
+    /**
+     * Le nombre de modules, arrondi vers le HAUT.
+     *
+     * Deux raisons, et la seconde est la plus importante.
+     *
+     * D'abord la cohérence : le dimensionnement électrique arrondissait au
+     * plus proche pendant que l'étude arrondissait au plus haut, et le même
+     * rapport annonçait « 8 modules » en page 3 et « 1 chaîne de 7 modules »
+     * en page 8. Un document qui se contredit d'une page à l'autre ne se
+     * défend devant aucun installateur.
+     *
+     * Ensuite l'honnêteté du chiffre : toute la production, toute l'économie
+     * et tout le temps de retour de cette étude sont calculés sur la
+     * puissance visée. Arrondir vers le bas installerait moins que ce qui a
+     * été promis — le client s'en apercevrait sur sa première facture. Vers
+     * le haut, il en a au moins autant.
+     */
+    modules: Math.max(1, Math.ceil((kwc * 1000) / moduleWc)),
+    /** La puissance réellement posée avec ce nombre entier de modules. */
+    puissanceInstallee: Math.round(Math.max(1,
+      Math.ceil((kwc * 1000) / moduleWc)) * moduleWc) / 1000,
+    moduleWc,
     annees,
   };
 }
