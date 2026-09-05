@@ -1,7 +1,7 @@
 {
-  "name": "boutique",
+  "name": "solarys-site",
   "version": "0.1.0",
-  "description": "Boutique en ligne — Tunisie. Commande par WhatsApp, paiement à la livraison.",
+  "description": "Étude photovoltaïque gratuite pour les foyers tunisiens.",
   "type": "module",
   "private": true,
   "scripts": {
