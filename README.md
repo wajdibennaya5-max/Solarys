@@ -75,7 +75,8 @@ node tools/cle.mjs "commande-2026-014" --formule credits --dossiers 5
 
 L'outil affiche la clé et le message à renvoyer au client. La chaîne complète
 — commande, règlement, émission, activation — est décrite dans
-[`docs/VENDRE.md`](docs/VENDRE.md).
+[`docs/VENDRE.md`](docs/VENDRE.md), et la recherche des premiers clients dans
+[`docs/PROSPECTION.md`](docs/PROSPECTION.md).
 
 ## Limites assumées
 
