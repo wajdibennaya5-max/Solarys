@@ -53,11 +53,29 @@ Ordres de grandeur contrôlés par les tests : Tunis 36,8 °N à 31° →
 ```bash
 cd app
 npm start   # http://localhost:8080
-npm test    # 94 tests du moteur de calcul et des traductions
+npm test    # 139 tests : moteur de calcul, traductions, boutique et licences
 ```
 
 Aucune dépendance, aucune étape de construction : ce sont des modules
 JavaScript natifs servis tels quels.
+
+## Vendre
+
+Les trois formules et l'encaissement se configurent en un seul endroit,
+`app/js/boutique.js` — la vitrine et l'application le lisent toutes les deux.
+Tant qu'aucun moyen n'y est renseigné, les formules s'affichent sans se
+vendre, plutôt que de mener à une page morte.
+
+Une fois un règlement reçu, la clé s'émet en une commande :
+
+```bash
+node tools/cle.mjs "jean@bureau-etudes.fr"
+node tools/cle.mjs "commande-2026-014" --formule credits --dossiers 5
+```
+
+L'outil affiche la clé et le message à renvoyer au client. La chaîne complète
+— commande, règlement, émission, activation — est décrite dans
+[`docs/VENDRE.md`](docs/VENDRE.md).
 
 ## Limites assumées
 

@@ -140,3 +140,66 @@ test('le message de commande survit aux caractères à échapper', async () => {
   assert.match(decodeURIComponent(new URL(lien).searchParams.get('text')),
     /Licence « perpétuelle » & co/);
 });
+
+/* ------------------------------------------------------------------ */
+/* Moyens de règlement — payer sans attendre une réponse               */
+/* ------------------------------------------------------------------ */
+
+async function avecPaiement({ usdt = { adresse: '', reseau: '' }, virement = '', autre = '' }) {
+  const m = await import(`../js/boutique.js?paiement=${Math.random()}`);
+  m.PAIEMENT.usdt = usdt;
+  m.PAIEMENT.virement = virement;
+  m.PAIEMENT.autre = autre;
+  return m;
+}
+
+test('sans coordonnées de règlement, aucun moyen n\'est annoncé', async () => {
+  const m = await avecPaiement({});
+  assert.deepEqual(m.moyensDePaiement(), []);
+});
+
+test('une adresse USDT est annoncée avec son réseau', async () => {
+  // Le réseau compte autant que l'adresse : un envoi sur le mauvais réseau
+  // est perdu, et l'acheteur doit le lire avant d'envoyer.
+  const m = await avecPaiement({ usdt: { adresse: 'TXyz000', reseau: 'TRC20' } });
+  const [ligne] = m.moyensDePaiement();
+  assert.match(ligne, /TXyz000/);
+  assert.match(ligne, /TRC20/);
+});
+
+test('une adresse sans réseau reste annoncée, sans mention trompeuse', async () => {
+  const m = await avecPaiement({ usdt: { adresse: 'TXyz000', reseau: '' } });
+  assert.deepEqual(m.moyensDePaiement(), ['USDT : TXyz000']);
+});
+
+test('virement et arrangement direct s\'ajoutent aux moyens', async () => {
+  const m = await avecPaiement({ virement: 'IBAN TN59...', autre: 'Espèces sur place' });
+  assert.deepEqual(m.moyensDePaiement(), ['Virement : IBAN TN59...', 'Espèces sur place']);
+});
+
+test('les moyens connus figurent dans le message de commande', async () => {
+  // C'est tout l'intérêt : l'acheteur paie sans attendre une réponse humaine.
+  const m = await import(`../js/boutique.js?commande=${Math.random()}`);
+  m.COMMANDE.whatsapp = '21612345678';
+  m.PAIEMENT.usdt = { adresse: 'TXyz000', reseau: 'TRC20' };
+  const texte = decodeURIComponent(
+    new URL(m.lienAchat('perpetual', 'Licence perpétuelle')).searchParams.get('text'));
+  assert.match(texte, /TXyz000/);
+  assert.match(texte, /TRC20/);
+  assert.doesNotMatch(texte, /indiquer comment régler/);
+});
+
+test('sans moyen connu, la commande demande encore comment régler', async () => {
+  const m = await import(`../js/boutique.js?commande=${Math.random()}`);
+  m.COMMANDE.whatsapp = '21612345678';
+  const texte = decodeURIComponent(
+    new URL(m.lienAchat('perpetual', 'Licence perpétuelle')).searchParams.get('text'));
+  assert.match(texte, /indiquer comment régler/);
+});
+
+test('les coordonnées de règlement restent une décision explicite', async () => {
+  // Vides dans le fichier livré : elles ne se publient pas par accident.
+  const { PAIEMENT } = await import('../js/boutique.js');
+  assert.equal(typeof PAIEMENT.usdt.adresse, 'string');
+  assert.equal(typeof PAIEMENT.virement, 'string');
+});

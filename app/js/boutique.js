@@ -64,6 +64,51 @@ export const COMMANDE = {
   courriel: '',
 };
 
+/**
+ * MOYENS DE RÈGLEMENT — ce que l'acheteur lit dans sa demande de commande.
+ *
+ * Sans cela, une commande demande « comment régler ? » et attend une réponse :
+ * un aller-retour de plus, et autant d'acheteurs perdus en route. Renseigner
+ * un moyen ici, c'est permettre à quelqu'un de payer dans la minute où il
+ * décide d'acheter.
+ *
+ * HONNÊTETÉ TECHNIQUE : aucun de ces moyens ne confirme le paiement tout
+ * seul. Le vendeur constate le règlement — relevé bancaire, explorateur de
+ * chaîne — puis émet la clé avec `tools/cle.mjs`. C'est une vente au détail,
+ * pas une caisse automatique ; en dessous de quelques ventes par jour, c'est
+ * amplement suffisant, et cela évite d'attendre la validation d'un compte
+ * marchand pour encaisser sa première licence.
+ *
+ *   usdt     : adresse de réception et réseau. Le réseau compte autant que
+ *              l'adresse — un envoi sur le mauvais réseau est perdu.
+ *   virement : RIB, IBAN, ou ce que la banque demande, en une ligne.
+ *   autre    : tout ce qui se règle autrement — espèces, mandat, de la main
+ *              à la main.
+ *
+ * Vides par défaut : des coordonnées de règlement ne se publient que par une
+ * décision explicite de leur propriétaire.
+ */
+export const PAIEMENT = {
+  usdt: { adresse: '', reseau: '' },
+  virement: '',
+  autre: '',
+};
+
+/**
+ * Les moyens de règlement renseignés, en phrases lisibles par l'acheteur.
+ * Vide tant que rien n'est branché : on ne promet pas un moyen qu'on n'a pas.
+ */
+export function moyensDePaiement() {
+  const out = [];
+  const { adresse, reseau } = PAIEMENT.usdt ?? {};
+  if (adresse) {
+    out.push(`USDT${reseau ? ` (réseau ${reseau})` : ''} : ${adresse}`);
+  }
+  if (PAIEMENT.virement) out.push(`Virement : ${PAIEMENT.virement}`);
+  if (PAIEMENT.autre) out.push(PAIEMENT.autre);
+  return out;
+}
+
 /** Cette formule mène-t-elle à un paiement en ligne ? */
 export const estOuverte = (plan) => Boolean(OFFRES[plan]?.lien);
 
@@ -84,9 +129,15 @@ export function lienAchat(plan, nomFormule = plan) {
   if (offre.lien) return offre.lien;
   if (!commandeDirecte()) return null;
 
+  // Quand un moyen de règlement est connu, l'acheteur peut payer sans
+  // attendre de réponse ; sinon la demande reste une demande.
+  const moyens = moyensDePaiement();
   const message =
     `Bonjour, je souhaite commander Solarys — ${nomFormule} (${offre.prix}${offre.unite ? ' ' + offre.unite : ''}).`
-    + ' Merci de m\'indiquer comment régler.';
+    + (moyens.length
+      ? ` Règlement possible par — ${moyens.join(' — ')}.`
+        + ' Je vous confirme dès que c\'est fait, et je reçois ma clé en retour.'
+      : ' Merci de m\'indiquer comment régler.');
 
   if (COMMANDE.whatsapp) {
     const numero = COMMANDE.whatsapp.replace(/[^0-9]/g, '');
