@@ -168,32 +168,43 @@ export const ICONES = {
  */
 export function panneauTechnique(dim, verdict) {
   if (!dim) return '';
-  const v = { conforme: '✓', verifier: '⚠', hors: '✕' };
+  const v = { conforme: '✓', verifier: '⚠', hors: '✕', inconnu: '?' };
+  const nom = { conforme: 'Conforme', verifier: 'À vérifier',
+    hors: 'Hors limites', inconnu: 'Non vérifiable' };
   const nb = (n, d = 0) => n.toLocaleString('fr-FR',
     { minimumFractionDigits: d, maximumFractionDigits: d });
+
+  // Une valeur qu'on n'a pas pu calculer s'écrit « non calculable », jamais
+  // « 0 » ni « NaN » : un zéro se lit comme une mesure.
+  const ou = (valeur, ecrire) => (valeur === null || valeur === undefined
+    || !Number.isFinite(Number(valeur)) ? 'non calculable' : ecrire(Number(valeur)));
 
   const lignes = [
     ['Module', `${dim.module.nom} — ${dim.module.puissance} Wc`],
     ['Onduleur', `${dim.onduleur.nom} — ${dim.onduleur.mppt} MPPT`],
-    ['Champ', `${dim.chaines} chaîne${dim.chaines > 1 ? 's' : ''} de ${
-      dim.longueur} modules, soit ${dim.modules} modules`],
-    ['Puissance DC', `${nb(dim.puissanceDc, 2)} kWc`],
-    ['Puissance AC', `${nb(dim.puissanceAc)} kW`],
-    ['Rapport DC/AC', nb(dim.ratio, 2)],
-    ['Tension à vide, modules froids', `${nb(dim.vocChaine)} V`],
-    ['Tension MPP, conditions standard', `${nb(dim.vmpChaineStc)} V`],
-    ['Tension MPP, cellule à 70 °C', `${nb(dim.vmpChaineChaud)} V`],
-    ['Courant de fonctionnement par MPPT', `${nb(dim.courantFonctionnement, 1)} A`],
-    ['Courant de court-circuit majoré', `${nb(dim.courantCourtCircuit, 1)} A`],
-    ['Longueurs de chaîne admissibles', `${dim.bornes.min} à ${dim.bornes.max} modules`],
+    ['Champ', dim.chaines
+      ? `${dim.chaines} chaîne${dim.chaines > 1 ? 's' : ''} de ${
+        dim.longueur} modules, soit ${dim.modules} modules`
+      : `${dim.modules} modules — répartition non calculable`],
+    ['Puissance DC', ou(dim.puissanceDc, (x) => `${nb(x, 2)} kWc`)],
+    ['Puissance AC', ou(dim.puissanceAc, (x) => `${nb(x)} kW`)],
+    ['Rapport DC/AC', ou(dim.ratio, (x) => nb(x, 2))],
+    ['Tension à vide, modules froids', ou(dim.vocChaine, (x) => `${nb(x)} V`)],
+    ['Tension MPP, conditions standard', ou(dim.vmpChaineStc, (x) => `${nb(x)} V`)],
+    ['Tension MPP, cellule à 70 °C', ou(dim.vmpChaineChaud, (x) => `${nb(x)} V`)],
+    ['Courant de fonctionnement par MPPT',
+      ou(dim.courantFonctionnement, (x) => `${nb(x, 1)} A`)],
+    ['Courant de court-circuit majoré',
+      ou(dim.courantCourtCircuit, (x) => `${nb(x, 1)} A`)],
+    ['Longueurs de chaîne admissibles', dim.bornes?.min
+      ? `${dim.bornes.min} à ${dim.bornes.max} modules` : 'non calculables'],
   ];
 
   return `<details class="technique" id="technique">
     <summary>
       <span class="tq-titre">Mode technicien — dimensionnement électrique</span>
-      <span class="tq-verdict tq-${verdict}">${v[verdict]} ${
-        verdict === 'conforme' ? 'Conforme' : verdict === 'verifier' ? 'À vérifier'
-          : 'Hors limites'}</span>
+      <span class="tq-verdict tq-${verdict}">${v[verdict] ?? '?'} ${
+        nom[verdict] ?? 'Non vérifiable'}</span>
     </summary>
 
     <div class="tq-controles">
@@ -205,6 +216,9 @@ export function panneauTechnique(dim, verdict) {
         </div>
         <p class="tq-c-lim">${c.limite}</p>
         <p class="tq-c-txt">${c.pourquoi}</p>
+        ${c.donneesManquantes?.length
+          ? `<p class="tq-manque">Données absentes : ${
+            c.donneesManquantes.join(', ')}</p>` : ''}
       </div>`).join('')}
     </div>
 
@@ -214,10 +228,14 @@ export function panneauTechnique(dim, verdict) {
         <td>${val}</td></tr>`).join('')}</tbody>
     </table>
 
+    ${dim.incomplet ? `<p class="tq-manque">Aucun contrôle électrique n’a pu
+      être fait : ${dim.manquants.join(', ')} ${dim.manquants.length > 1
+        ? 'manquent' : 'manque'} au catalogue.</p>` : ''}
+
     <p class="tq-note">Les limites viennent du catalogue de matériel du site,
       non d’une fiche constructeur signée, et les températures de
       dimensionnement sont celles retenues pour le climat tunisien
-      (${dim.module.coeffVoc} %/°C sur la tension à vide). Un site d’altitude
+      (${dim.module.coeffVoc ?? '?'} %/°C sur la tension à vide). Un site d’altitude
       descend plus bas : vérifiez la température minimale avant de commander.</p>
   </details>`;
 }

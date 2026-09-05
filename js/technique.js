@@ -20,20 +20,30 @@
  * Chaque verdict nomme la valeur ET la limite qui l'a produit. « Hors
  * limites » sans le nombre n'aide personne à corriger.
  */
-import { MODULE_DEFAUT, onduleurPour, vocA, vmpA, TEMPERATURES } from './materiel.js';
-
-/** Les trois verdicts, du plus rassurant au plus grave. */
-export const VERDICTS = {
-  conforme: { rang: 0, signe: '✓', nom: 'Conforme selon les limites configurées' },
-  verifier: { rang: 1, signe: '⚠', nom: 'À vérifier' },
-  hors: { rang: 2, signe: '✕', nom: 'Configuration hors limites configurées' },
-};
+import { MODULE_DEFAUT, onduleurPour, TEMPERATURES } from './materiel.js';
+import { valider, bornesChaine as bornesValidation, etatGlobal, donneesManquantes,
+  ETATS, MARGE_COURANT as MARGE } from './validation.js';
 
 /**
- * Marge de sécurité sur le courant, avant l'entrée de l'onduleur.
- * Un ciel voilé qui se déchire donne brièvement plus que 1000 W/m².
+ * Les verdicts, du plus rassurant au plus grave.
+ *
+ * `inconnu` a été ajouté après coup, et c'est le plus important des quatre :
+ * une fiche technique incomplète produisait auparavant des comparaisons avec
+ * `undefined` — toutes fausses, toutes silencieusement « conformes » — ou
+ * faisait carrément planter le calcul. Voir `validation.js`.
  */
-export const MARGE_COURANT = 1.25;
+export const VERDICTS = {
+  conforme: { rang: 0, signe: '✓', nom: 'Conforme selon les limites configurées' },
+  inconnu: { rang: 1, signe: '?', nom: 'Non vérifiable — données manquantes' },
+  verifier: { rang: 2, signe: '⚠', nom: 'À vérifier' },
+  hors: { rang: 3, signe: '✕', nom: 'Configuration hors limites configurées' },
+};
+
+/** Correspondance avec le vocabulaire du moteur de validation. */
+const DEPUIS_ETAT = { pass: 'conforme', unknown: 'inconnu', warning: 'verifier', fail: 'hors' };
+
+/** Marge de sécurité sur le courant, avant l'entrée de l'onduleur. */
+export const MARGE_COURANT = MARGE;
 
 /** Plage de rapport puissance crête / puissance onduleur jugée saine. */
 /**
@@ -61,17 +71,7 @@ export function nombreDeModules(puissanceKwc, mod = MODULE_DEFAUT) {
  * @returns {{min:number, max:number, vocFroid:number, vmpChaud:number}}
  */
 export function bornesChaine(mod, onduleur) {
-  const m = mod ?? MODULE_DEFAUT;
-  const vocFroid = vocA(m, TEMPERATURES.min);
-  const vmpChaud = vmpA(m, TEMPERATURES.max);
-  return {
-    // Au-delà, la tension à vide d'un matin d'hiver dépasse la limite absolue.
-    max: Math.floor(onduleur.vMax / vocFroid),
-    // En deçà, la chaîne sort de la plage MPPT en plein été.
-    min: Math.max(1, Math.ceil(onduleur.vMpptMin / vmpChaud)),
-    vocFroid,
-    vmpChaud,
-  };
+  return bornesValidation(mod ?? MODULE_DEFAUT, onduleur);
 }
 
 /**
@@ -91,6 +91,41 @@ export function dimensionner({ puissance, module: mod = MODULE_DEFAUT, onduleur 
   const ond = onduleur ?? onduleurPour(kwcReel);
   if (!ond) return null;
   const bornes = bornesChaine(mod, ond);
+
+  // FICHE INCOMPLÈTE : on ne devine pas, on le dit. Auparavant, un champ
+  // manquant produisait un `NaN` qui se propageait dans toutes les bornes,
+  // vidait la recherche de configuration, et rendait `null` sans un mot — ou
+  // faisait planter l'affichage du résultat. Le jour où ce catalogue sera
+  // remplacé par un vrai catalogue fournisseur, une fiche incomplète est
+  // certaine.
+  if (bornes.manquants?.length) {
+    return {
+      onduleur: ond, module: mod, modules, modulesVises: modules,
+      repartitionExacte: false, incomplet: true, manquants: bornes.manquants,
+      longueur: null, chaines: null, chainesParMppt: null, bornes,
+      puissanceDc: kwcReel, puissanceAc: ond.puissance, ratio: null,
+      vocChaine: null, vmpChaineChaud: null, vmpChaineStc: null,
+      courantFonctionnement: null, courantCourtCircuit: null,
+      // Le contrôle dit ce qui manque VRAIMENT — les champs de la fiche —
+      // et non « longueur, chaines », qui ne sont absents que parce que la
+      // fiche incomplète a empêché de les calculer.
+      controles: [{
+        cle: 'fiche',
+        nom: 'Fiche technique du matériel',
+        etat: 'unknown',
+        verdict: 'inconnu',
+        mesure: '—',
+        limite: '—',
+        donneesManquantes: bornes.manquants,
+        pourquoi: `Aucun contrôle électrique n’a pu être fait : ${
+          bornes.manquants.join(', ')} ${bornes.manquants.length > 1
+          ? 'manquent' : 'manque'} à la fiche. Une donnée absente ne vaut pas `
+          + 'une validation positive. Complétez le catalogue, ou faites vérifier '
+          + 'le dimensionnement par l’installateur.',
+      }],
+    };
+  }
+
   const entrees = ond.mppt * ond.chainesParMppt;
 
   // TOUTES les répartitions sont pesées, pas seulement celles qui tombent
@@ -186,138 +221,49 @@ export function dimensionner({ puissance, module: mod = MODULE_DEFAUT, onduleur 
     vmpChaineStc,
     courantFonctionnement,
     courantCourtCircuit,
-    controles: controler({
-      ond, longueur, chaines, chainesParMppt, vocChaine, vmpChaineChaud,
-      vmpChaineStc, courantFonctionnement, courantCourtCircuit, ratio, exact,
-      bornes, modules, contraint,
-    }),
+    incomplet: false,
+    manquants: [],
+    controles: [
+      ...enVerdicts(valider({ module: mod, onduleur: ond, longueur, chaines,
+        chainesParMppt })),
+      ...controlesDeRepartition({ ond, longueur, chaines, exact, contraint, modules }),
+    ],
   };
 }
 
 /** Le verdict le plus grave d'une liste de contrôles. */
 export function verdictGlobal(controles) {
-  if (!controles?.length) return 'conforme';
+  if (!controles?.length) return 'inconnu';
   return controles.reduce((pire, c) =>
     (VERDICTS[c.verdict].rang > VERDICTS[pire].rang ? c.verdict : pire), 'conforme');
 }
 
+/** Tout ce qui manque pour conclure, sans doublon. */
+export function manquePourConclure(dim) {
+  return donneesManquantes(dim?.controles ?? []);
+}
+
+/** Traduit les états du moteur de validation dans le vocabulaire d'ici. */
+function enVerdicts(controles) {
+  return controles.map((c) => ({ ...c, verdict: DEPUIS_ETAT[c.etat] ?? 'inconnu' }));
+}
+
 /**
- * Les contrôles, un par un.
- * Chacun dit ce qu'il a mesuré, contre quelle limite, et pourquoi.
+ * Les deux contrôles qui ne relèvent pas de l'électricité mais de la
+ * répartition : ils appartiennent au dimensionnement, pas à la validation.
  */
-function controler({ ond, longueur, chaines, chainesParMppt, vocChaine, vmpChaineChaud,
-  vmpChaineStc, courantFonctionnement, courantCourtCircuit, ratio, exact,
-  bornes, modules, contraint }) {
-  // Le point décimal anglais au milieu d'une page française fait douter du
-  // reste : « 13.1 A » se lit comme une coquille.
-  const v = (n) => `${Math.round(n).toLocaleString('fr-FR')} V`;
-  const a = (n) => `${n.toLocaleString('fr-FR', {
-    minimumFractionDigits: 1, maximumFractionDigits: 1 })} A`;
-  const controles = [];
-
-  controles.push({
-    cle: 'tension-froid',
-    nom: `Tension à vide à ${TEMPERATURES.min} °C`,
-    mesure: v(vocChaine),
-    limite: `maximum ${v(ond.vMax)}`,
-    verdict: vocChaine > ond.vMax ? 'hors'
-      : vocChaine > ond.vMax * 0.95 ? 'verifier' : 'conforme',
-    pourquoi: vocChaine > ond.vMax
-      ? `${longueur} modules en série dépassent la tension maximale de l’onduleur `
-        + 'un matin d’hiver. Raccourcissez la chaîne : l’entrée serait détruite.'
-      : vocChaine > ond.vMax * 0.95
-        ? 'La marge est inférieure à 5 %. Vérifiez la température minimale du '
-          + 'site avant de valider — un site d’altitude descend plus bas.'
-        : 'La chaîne reste sous la tension maximale, modules froids et à vide.',
-  });
-
-  controles.push({
-    cle: 'tension-chaud',
-    nom: `Tension MPP à ${TEMPERATURES.max} °C de cellule`,
-    mesure: v(vmpChaineChaud),
-    limite: `plage MPPT ${v(ond.vMpptMin)} – ${v(ond.vMpptMax)}`,
-    verdict: vmpChaineChaud < ond.vMpptMin ? 'hors'
-      : vmpChaineChaud < ond.vMpptMin * 1.08 ? 'verifier' : 'conforme',
-    pourquoi: vmpChaineChaud < ond.vMpptMin
-      ? 'En plein été, la chaîne sort de la plage MPPT : l’onduleur cesse de '
-        + 'suivre le point de puissance au moment où le champ produit le plus. '
-        + `Il faut au moins ${bornes.min} modules par chaîne.`
-      : vmpChaineChaud < ond.vMpptMin * 1.08
-        ? 'La chaîne frôle le bas de la plage MPPT par forte chaleur. Une '
-          + 'toiture mal ventilée peut dépasser 70 °C de cellule.'
-        : 'La chaîne reste dans la plage MPPT même par forte chaleur.',
-  });
-
-  controles.push({
-    cle: 'tension-stc',
-    nom: 'Tension MPP aux conditions standard',
-    mesure: v(vmpChaineStc),
-    limite: `plage MPPT ${v(ond.vMpptMin)} – ${v(ond.vMpptMax)}`,
-    verdict: (vmpChaineStc > ond.vMpptMax || vmpChaineStc < ond.vMpptMin)
-      ? 'verifier' : 'conforme',
-    pourquoi: vmpChaineStc > ond.vMpptMax
-      ? 'Au-dessus de la plage MPPT en conditions standard : l’onduleur '
-        + 'écrêtera une partie de l’année.'
-      : vmpChaineStc < ond.vMpptMin
-        ? 'Sous la plage MPPT en conditions standard : le rendement de '
-          + 'conversion sera dégradé une bonne partie de l’année.'
-        : 'La chaîne travaille au cœur de la plage MPPT.',
-  });
-
-  controles.push({
-    cle: 'courant',
-    nom: `Courant de fonctionnement par MPPT (${chainesParMppt} chaîne${
-      chainesParMppt > 1 ? 's' : ''} en parallèle)`,
-    mesure: a(courantFonctionnement),
-    limite: `maximum ${a(ond.iMpptMax)}`,
-    verdict: courantFonctionnement > ond.iMpptMax ? 'hors'
-      : courantFonctionnement > ond.iMpptMax * 0.95 ? 'verifier' : 'conforme',
-    pourquoi: courantFonctionnement > ond.iMpptMax
-      ? 'Trop de chaînes en parallèle sur une même entrée : l’onduleur écrêtera '
-        + 'le courant. Répartissez sur davantage de MPPT, prenez un onduleur qui '
-        + 'accepte plus de courant, ou scindez le champ sur deux onduleurs.'
-      : 'Le courant au point de puissance reste dans les limites de l’entrée.',
-  });
-
-  controles.push({
-    cle: 'court-circuit',
-    nom: `Courant de court-circuit majoré (marge ${
-      String(MARGE_COURANT).replace('.', ',')})`,
-    mesure: a(courantCourtCircuit),
-    limite: `maximum ${a(ond.iScMax)}`,
-    verdict: courantCourtCircuit > ond.iScMax ? 'hors'
-      : courantCourtCircuit > ond.iScMax * 0.95 ? 'verifier' : 'conforme',
-    pourquoi: courantCourtCircuit > ond.iScMax
-      ? 'Un ciel voilé qui se déchire peut dépasser les conditions standard. '
-        + 'L’entrée doit tenir ce courant sans être endommagée.'
-      : 'L’entrée tient le court-circuit, marge de surirradiance comprise.',
-  });
-
-  controles.push({
-    cle: 'ratio',
-    nom: 'Rapport puissance crête / puissance onduleur',
-    mesure: ratio.toFixed(2).replace('.', ','),
-    limite: `plage saine ${RATIO.bas.toFixed(2)} – ${RATIO.haut.toFixed(2)}`.replace(/\./g, ','),
-    verdict: (ratio < RATIO.plancher || ratio > RATIO.plafond) ? 'hors'
-      : (ratio < RATIO.bas || ratio > RATIO.haut) ? 'verifier' : 'conforme',
-    pourquoi: ratio > RATIO.haut
-      ? 'Le champ est nettement plus gros que l’onduleur : l’écrêtage sera '
-        + 'sensible aux heures de pointe. Ce peut être un choix assumé sur un '
-        + 'toit très bien exposé, ce n’est pas un accident acceptable ailleurs.'
-      : ratio < RATIO.bas
-        ? 'L’onduleur est plus grand que le champ : il travaillera souvent à '
-          + 'faible charge, là où son rendement est le moins bon.'
-        : 'Le champ est légèrement surdimensionné par rapport à l’onduleur, '
-          + 'comme il se doit : les conditions standard ne sont presque jamais atteintes.',
-  });
+function controlesDeRepartition({ ond, longueur, chaines, exact, contraint, modules }) {
+  const sortie = [];
 
   if (contraint) {
-    controles.push({
+    sortie.push({
       cle: 'capacite',
       nom: 'Capacité de l’onduleur',
       mesure: `${chaines} × ${longueur} = ${chaines * longueur} modules`,
       limite: `${modules} modules visés`,
+      etat: 'fail',
       verdict: 'hors',
+      donneesManquantes: [],
       pourquoi: `Cet onduleur ne peut pas porter le champ demandé : ses `
         + `${ond.mppt} MPPT et ses bornes de tension plafonnent à `
         + `${chaines * longueur} modules. Prenez un onduleur plus grand, ou `
@@ -326,12 +272,14 @@ function controler({ ond, longueur, chaines, chainesParMppt, vocChaine, vmpChain
   }
 
   if (!exact && !contraint) {
-    controles.push({
+    sortie.push({
       cle: 'repartition',
       nom: 'Répartition en chaînes égales',
       mesure: `${chaines} × ${longueur} = ${chaines * longueur} modules`,
       limite: `${modules} modules visés`,
+      etat: 'warning',
       verdict: 'verifier',
+      donneesManquantes: [],
       pourquoi: 'Le nombre de modules ne se répartit pas en chaînes de longueur '
         + 'égale dans les bornes de tension. Ajustez le nombre de modules, ou '
         + 'prévoyez un second onduleur — mélanger deux longueurs sur un même '
@@ -339,5 +287,5 @@ function controler({ ond, longueur, chaines, chainesParMppt, vocChaine, vmpChain
     });
   }
 
-  return controles;
+  return sortie;
 }

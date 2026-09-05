@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { dimensionner, bornesChaine, nombreDeModules, verdictGlobal, VERDICTS,
-  MARGE_COURANT, RATIO } from '../js/technique.js';
+  MARGE_COURANT, RATIO, manquePourConclure } from '../js/technique.js';
+import { valider, etatGlobal, ETATS } from '../js/validation.js';
 import { MODULES, MODULE_DEFAUT, ONDULEURS, onduleurPour, vocA, vmpA, TEMPERATURES }
   from '../js/materiel.js';
 
@@ -137,9 +138,13 @@ test('chaque contrôle porte une mesure, une limite et une explication', () => {
 });
 
 test('le verdict global est le plus grave de tous', () => {
-  assert.equal(verdictGlobal([]), 'conforme');
+  // Aucun contrôle du tout, c'est « on n'a rien vérifié » — pas « conforme ».
+  assert.equal(verdictGlobal([]), 'inconnu');
   assert.equal(verdictGlobal([{ verdict: 'conforme' }, { verdict: 'verifier' }]), 'verifier');
   assert.equal(verdictGlobal([{ verdict: 'hors' }, { verdict: 'verifier' }]), 'hors');
+  // Un contrôle non vérifiable ne doit jamais s'effacer derrière un conforme.
+  assert.equal(verdictGlobal([{ verdict: 'conforme' }, { verdict: 'inconnu' }]), 'inconnu');
+  assert.equal(verdictGlobal([{ verdict: 'inconnu' }, { verdict: 'hors' }]), 'hors');
 });
 
 test('l’onduleur est choisi sur la puissance réellement posée', () => {
@@ -179,4 +184,76 @@ test('les nombres affichés sont écrits en français', () => {
     assert.ok(!/\d\.\d/.test(c.mesure), `${c.cle} : « ${c.mesure} » garde un point décimal`);
     assert.ok(!/\d\.\d/.test(c.limite), `${c.cle} : « ${c.limite} » garde un point décimal`);
   }
+});
+
+/* ------------------------------------------------------------------ */
+/* Fiches incomplètes — une donnée absente ne vaut jamais un « conforme » */
+/* ------------------------------------------------------------------ */
+
+test('une fiche d’onduleur incomplète ne fait plus planter le calcul', () => {
+  // Elle levait une TypeError en pleine construction du tableau de bord :
+  // la page de résultat entière disparaissait.
+  const ond = { ...ONDULEURS.at(-2) };
+  delete ond.iScMax;
+  const d = dimensionner({ puissance: 10, onduleur: ond });
+  assert.ok(d, 'aucun dimensionnement rendu');
+  const c = d.controles.find((x) => x.cle === 'court-circuit');
+  assert.equal(c.verdict, 'inconnu');
+  assert.deepEqual(c.donneesManquantes, ['onduleur.iScMax']);
+});
+
+test('un champ manquant sort en INCONNU, jamais en conforme', () => {
+  const cas = [
+    ['module.imp', { puissance: 10, module: { ...MODULE_DEFAUT, imp: undefined } }, 'courant'],
+    ['module.isc', { puissance: 10, module: { ...MODULE_DEFAUT, isc: null } }, 'court-circuit'],
+  ];
+  for (const [quoi, arg, cle] of cas) {
+    const d = dimensionner(arg);
+    const c = d.controles.find((x) => x.cle === cle);
+    assert.equal(c.verdict, 'inconnu', `${quoi} : ${c.verdict}`);
+    assert.ok(c.donneesManquantes.includes(quoi), `${quoi} non nommé`);
+    assert.ok(c.pourquoi.includes('ne vaut pas'), 'le contrôle n’explique pas pourquoi');
+  }
+});
+
+test('sans coefficient de température, aucun contrôle électrique n’est prétendu', () => {
+  const d = dimensionner({ puissance: 10, module: { ...MODULE_DEFAUT, coeffVoc: undefined } });
+  assert.equal(d.incomplet, true);
+  assert.equal(verdictGlobal(d.controles), 'inconnu');
+  assert.ok(manquePourConclure(d).includes('module.coeffVoc'),
+    'le champ réellement absent doit être nommé');
+  assert.ok(!d.controles.some((c) => c.verdict === 'conforme'),
+    'aucun contrôle ne doit se déclarer conforme sur des données absentes');
+});
+
+test('une valeur nulle ou absente n’est jamais lue comme un zéro valide', () => {
+  // `Number(null)` vaut zéro : un test naïf déclarerait la donnée connue et
+  // repartirait sur des zéros — un rapport DC/AC de 0,00 « hors limites »
+  // au lieu de « non vérifiable ».
+  const c = valider({ module: MODULE_DEFAUT, onduleur: ONDULEURS.at(-1),
+    longueur: null, chaines: null });
+  assert.equal(c.length, 1);
+  assert.equal(c[0].etat, 'unknown');
+  assert.equal(etatGlobal(c), 'unknown');
+});
+
+test('les quatre états existent et s’ordonnent du plus rassurant au plus grave', () => {
+  assert.deepEqual(Object.keys(ETATS), ['pass', 'unknown', 'warning', 'fail']);
+  assert.ok(ETATS.pass.rang < ETATS.unknown.rang);
+  assert.ok(ETATS.unknown.rang < ETATS.warning.rang);
+  assert.ok(ETATS.warning.rang < ETATS.fail.rang);
+  // INCONNU ne s'efface pas derrière un CONFORME, et n'accuse pas non plus.
+  assert.equal(etatGlobal([{ etat: 'pass' }, { etat: 'unknown' }]), 'unknown');
+  assert.equal(etatGlobal([{ etat: 'unknown' }, { etat: 'warning' }]), 'warning');
+  assert.equal(etatGlobal([]), 'unknown');
+});
+
+test('une configuration venue d’ailleurs se valide sans passer par notre dimensionnement', () => {
+  // C'est la raison d'être du moteur séparé : vérifier ce qu'un installateur
+  // a décidé lui-même.
+  const c = valider({ module: MODULE_DEFAUT, onduleur: ONDULEURS.find((o) => o.id === 'ond-10'),
+    longueur: 40, chaines: 1, chainesParMppt: 1 });
+  const froid = c.find((x) => x.cle === 'tension-froid');
+  assert.equal(froid.etat, 'fail', '40 modules en série doivent être refusés');
+  assert.match(froid.pourquoi, /détruite/);
 });
