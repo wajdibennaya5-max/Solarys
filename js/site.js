@@ -12,6 +12,7 @@ import { localiser, REFUS } from './geo.js';
 import { planCalepinage } from './calepinage.js';
 import { ORIENTATIONS, PENTES, expliquerOrientation } from './orientation.js';
 import { MOIS } from './gisement.js';
+import { PERIODES, REPERES, versAnnuel, verifier as verifierFacture } from './facture.js';
 import { construireGraphe, grapheMensuel } from './graphe.js';
 import { OFFRE, CONTACT, ouverte, redigerDemande, lienDemande, champsManquants,
   envoyerAuServeur, API } from './prospect.js';
@@ -47,48 +48,69 @@ const ETAPES = [
     valide: (v) => (v ? null : 'Choisissez votre gouvernorat pour continuer.'),
   },
   {
-    cle: 'consommation',
-    titre: 'Combien consommez-vous par an ?',
-    aide: 'En kilowattheures, tels qu’ils figurent sur vos factures STEG.',
-    champ: () => `<div class="champ">
-      <label for="consommation">Consommation annuelle (kWh)</label>
-      <input id="consommation" name="consommation" type="number" inputmode="numeric"
-        min="200" max="200000" step="1" placeholder="4800">
-      <p class="indice">Un foyer tunisien moyen consomme entre 2 000 et 6 000 kWh par an.</p>
+    cle: 'facture',
+    titre: 'Prenez votre dernière facture STEG',
+    aide: 'Deux nombres à recopier — rien à calculer, rien à connaître par cœur.',
+    champ: () => `
+    <svg viewBox="0 0 320 150" class="facture-schema" role="img"
+      aria-label="Extrait d’une facture STEG : la colonne Quantité et la case Total Electricité">
+      <rect x="1" y="1" width="318" height="148" rx="6" fill="var(--surface)"
+        stroke="var(--bord)" stroke-width="1.5"/>
+      <text x="12" y="20" class="fs-titre">CONSOMMATION &amp; SERVICES</text>
+      <line x1="12" y1="27" x2="308" y2="27" stroke="var(--bord)" stroke-width="1"/>
+      <text x="16" y="42" class="fs-tete">Libellés</text>
+      <text x="118" y="42" class="fs-tete">Index</text>
+      <text x="192" y="42" class="fs-tete">Quantité</text>
+      <text x="262" y="42" class="fs-tete">Montant</text>
+      <rect x="186" y="30" width="52" height="40" rx="4" fill="none"
+        stroke="var(--accent)" stroke-width="2"/>
+      <text x="16" y="60" class="fs-val">Électricité</text>
+      <text x="118" y="60" class="fs-pale">16338</text>
+      <text x="196" y="60" class="fs-fort">590</text>
+      <text x="262" y="60" class="fs-val">128,620</text>
+      <text x="212" y="84" text-anchor="middle" class="fs-note">1 — kWh consommés</text>
+      <rect x="12" y="96" width="166" height="26" rx="5" fill="none"
+        stroke="var(--accent)" stroke-width="2"/>
+      <text x="20" y="113" class="fs-fort">Total Electricité</text>
+      <text x="172" y="113" text-anchor="end" class="fs-fort">132,820</text>
+      <text x="95" y="136" text-anchor="middle" class="fs-note">2 — le montant à saisir</text>
+      <text x="196" y="113" class="fs-pale">Montant à payer</text>
+      <text x="308" y="113" text-anchor="end" class="fs-pale">554,000</text>
+      <text x="250" y="136" text-anchor="middle" class="fs-barre">pas celui-ci</text>
+    </svg>
+    <div class="champ">
+      <label for="quantite">1 — Quantité (kWh)</label>
+      <input id="quantite" name="quantite" type="number" inputmode="numeric"
+        min="1" step="1" placeholder="${REPERES.quantite.exemple}">
+      <p class="indice">${REPERES.quantite.aide}</p>
     </div>
-    <details class="repli"><summary>Où trouver ce chiffre ?</summary>
-      <p>Sur votre facture STEG, dans le relevé de consommation, en kWh. Les
-      factures étant bimestrielles, additionnez les six de l’année — ou
-      multipliez par six une facture représentative. Une approximation
-      raisonnable suffit à l’estimation.</p></details>`,
-    valide: (v) => {
-      const n = Number(v);
-      if (!(n > 0)) return 'Indiquez votre consommation annuelle en kWh.';
-      if (n < 200) return 'Ce chiffre paraît trop bas pour une année entière.';
-      if (n > 200000) return 'Au-delà de 200 000 kWh, il s’agit d’un projet industriel : écrivez-nous.';
-      return null;
-    },
-  },
-  {
-    cle: 'montant',
-    titre: 'Combien payez-vous par an ?',
-    aide: 'C’est ce qui permet de connaître VOTRE prix du kilowattheure, et non une moyenne.',
-    champ: () => `<div class="champ">
-      <label for="montant">Montant annuel payé à la STEG (DT)</label>
+    <div class="champ">
+      <label for="montant">2 — Total Électricité (DT)</label>
       <input id="montant" name="montant" type="number" inputmode="decimal"
-        min="50" max="500000" step="0.001" placeholder="1200">
-      <p class="indice">Total des six factures de l’année, électricité seule.</p>
+        min="0" step="0.001" placeholder="${REPERES.montant.exemple}">
+      <p class="indice">${REPERES.montant.aide}</p>
     </div>
-    <details class="repli"><summary>Pourquoi cette question ?</summary>
-      <p>Le tarif STEG est progressif et dépend de votre contrat : deux foyers
-      consommant autant ne paient pas le même prix. En divisant votre montant
-      par votre consommation, on obtient ce que <em>vous</em> payez réellement,
-      donc l’économie que <em>vous</em> feriez.</p></details>`,
-    valide: (v) => {
-      const n = Number(v);
-      if (!(n > 0)) return 'Indiquez le montant annuel payé à la STEG.';
-      if (n < 50) return 'Ce montant paraît trop bas pour une année entière.';
-      return null;
+    <div class="champ">
+      <label for="periode">Vous recevez une facture</label>
+      <select id="periode" name="periode">
+        ${PERIODES.map((p) => `<option value="${p.id}"${
+          p.defaut ? ' selected' : ''}>${p.nom}</option>`).join('')}
+      </select>
+    </div>
+    <details class="repli"><summary>Je n’ai pas ma facture sous la main</summary>
+      <p>Vous la retrouvez dans l’espace client STEG, ou sur le papier reçu par
+      la poste. Toutes les factures portent ces deux nombres au même endroit ;
+      n’importe laquelle des six de l’année convient.</p></details>`,
+    lire: () => ({
+      quantite: $('quantite')?.value ?? '',
+      montant: $('montant')?.value ?? '',
+      periode: $('periode')?.value ?? 'bimestrielle',
+    }),
+    valide: (v) => verifierFacture(v),
+    restaure: (v) => {
+      if ($('quantite')) $('quantite').value = v.quantite ?? '';
+      if ($('montant')) $('montant').value = v.montant ?? '';
+      if ($('periode')) $('periode').value = v.periode ?? 'bimestrielle';
     },
   },
   {
@@ -251,9 +273,11 @@ let simulation = { puissance: null, surface: 0 };
 /** Recalcule l'étude avec les réglages courants. */
 function etudeCourante() {
   const toit = reponses.toit ?? {};
+  const annuel = versAnnuel(reponses.facture ?? {});
+  if (!annuel) return null;
   return etudier({
-    consommationAnnuelle: Number(reponses.consommation),
-    montantAnnuel: Number(reponses.montant),
+    consommationAnnuelle: annuel.consommationAnnuelle,
+    montantAnnuel: annuel.montantAnnuel,
     gouvernorat: reponses.gouvernorat,
     surfaceDisponible: simulation.surface,
     puissance: simulation.puissance,
