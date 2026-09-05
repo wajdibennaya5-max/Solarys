@@ -16,6 +16,9 @@ import { PERIODES, REPERES } from './facture.js';
 import { METHODES, FIABILITES, resoudre, verifier as verifierConso, methode }
   from './consommation.js';
 import { QUESTIONS } from './profil.js';
+import { TYPES, typeBatiment, TYPE_DEFAUT } from './batiment.js';
+import { MODULES, MODULE_DEFAUT, moduleParId } from './materiel.js';
+import { POSES, optimiser } from './calepinage.js';
 import { construireGraphe, grapheMensuel } from './graphe.js';
 import { OFFRE, CONTACT, ouverte, redigerDemande, lienDemande, champsManquants,
   envoyerAuServeur, API } from './prospect.js';
@@ -252,6 +255,10 @@ function brancherConsommation() {
   dessinerFormConso();
 }
 
+/** Le type de bâtiment retenu, et la pose des modules. */
+let typeBat = TYPE_DEFAUT;
+let poseChoisie = 'auto';
+
 /**
  * Les étapes, dans l'ordre.
  *
@@ -261,7 +268,9 @@ function brancherConsommation() {
 const ETAPES = [
   {
     cle: 'gouvernorat',
-    titre: 'Où se trouve votre logement ?',
+    numero: '01',
+    court: 'Localisation',
+    titre: 'Où se trouve votre bâtiment ?',
     aide: 'Le soleil de Tozeur n’est pas celui de Bizerte : le calcul en tient compte.',
     champ: () => `<div class="geo">
       <button class="btn" type="button" id="localiser">
@@ -280,7 +289,28 @@ const ETAPES = [
     valide: (v) => (v ? null : 'Choisissez votre gouvernorat pour continuer.'),
   },
   {
+    cle: 'batiment',
+    numero: '02',
+    court: 'Bâtiment',
+    titre: 'Quel bâtiment voulez-vous équiper ?',
+    aide: 'Ce n’est pas une formalité : à midi, une maison est vide et un '
+      + 'atelier tourne. Le même toit n’a donc pas la même rentabilité.',
+    champ: () => `<div class="cartes-choix" id="batiments" role="radiogroup"
+      aria-label="Type de bâtiment">
+      ${TYPES.map((t) => `<button type="button" class="carte-choix" role="radio"
+        aria-checked="false" data-batiment="${t.id}">
+        <b>${t.nom}</b><span>${t.resume}</span>
+      </button>`).join('')}
+    </div>
+    <p class="indice" id="noteBatiment" role="status"></p>`,
+    lire: () => typeBat,
+    valide: (v) => (typeBatiment(v) ? null : 'Choisissez le type de bâtiment.'),
+    restaure: (v) => { if (typeBatiment(v)) typeBat = v; },
+  },
+  {
     cle: 'consommation',
+    numero: '03',
+    court: 'Consommation',
     titre: 'Que consommez-vous ?',
     aide: 'Le mieux, c’est votre dernière facture : deux nombres à recopier. '
       + 'Si vous ne l’avez pas, trois autres chemins mènent au même endroit.',
@@ -308,8 +338,11 @@ const ETAPES = [
   },
   {
     cle: 'toit',
-    titre: 'Comment est orienté votre toit ?',
-    aide: 'C’est ce qui pèse le plus : un pan plein est produit 17 % de moins qu’un plein sud.',
+    numero: '04',
+    court: 'Toiture',
+    titre: 'Parlez-nous de votre toiture',
+    aide: 'L’orientation pèse plus que tout le reste : un pan plein est produit '
+      + '17 % de moins qu’un plein sud.',
     champ: () => `<div class="champ">
       <label for="pente">Forme du toit</label>
       <select id="pente" name="pente">
@@ -325,47 +358,77 @@ const ETAPES = [
       </select>
       <p class="indice" id="noteOrientation"></p>
     </div>
+    <div class="duo">
+      <div class="champ">
+        <label for="toitL">Largeur du pan (m)</label>
+        <input id="toitL" name="toitL" type="number" inputmode="decimal"
+          min="0" max="200" step="0.1" placeholder="8">
+      </div>
+      <div class="champ">
+        <label for="toitP">Profondeur du pan (m)</label>
+        <input id="toitP" name="toitP" type="number" inputmode="decimal"
+          min="0" max="200" step="0.1" placeholder="6">
+      </div>
+    </div>
+    <p class="indice">Les cotes sont facultatives — mais ce sont elles qui
+      permettent de placer les panneaux sur VOTRE toit plutôt que sur un toit
+      moyen. Un mètre ruban et deux minutes suffisent.</p>
     <details class="repli"><summary>Je ne sais pas l’orientation</summary>
-      <p>Placez-vous devant votre maison, face à la façade principale. Au milieu
-      de la journée, le soleil est au sud : le pan qui reçoit le plus de soleil
-      à midi est le bon. Dans le doute, laissez « Plein sud » — l’étude détaillée
-      le vérifiera sur place.</p></details>`,
+      <p>Placez-vous devant votre bâtiment, face à la façade principale. Au
+      milieu de la journée, le soleil est au sud : le pan qui reçoit le plus de
+      soleil à midi est le bon. Dans le doute, laissez « Plein sud » — l’étude
+      détaillée le vérifiera sur place.</p></details>`,
     lire: () => ({
       pente: $('pente')?.value ?? 'moyenne',
       orientation: $('orientation')?.value ?? 'sud',
+      L: Number($('toitL')?.value) || 0,
+      P: Number($('toitP')?.value) || 0,
     }),
-    valide: () => null,
-    restaure: (v) => {
-      if ($('pente')) $('pente').value = v.pente ?? 'moyenne';
-      if ($('orientation')) $('orientation').value = v.orientation ?? 'sud';
-      majOrientation();
-    },
-  },
-  {
-    cle: 'toiture',
-    titre: 'Quelles sont les cotes de votre toiture ?',
-    aide: 'Facultatif — mais c’est ce qui permet de placer les panneaux sur VOTRE toit.',
-    champ: () => `<div class="champ">
-      <label for="toitL">Largeur du pan (m)</label>
-      <input id="toitL" name="toitL" type="number" inputmode="decimal"
-        min="0" max="200" step="0.1" placeholder="8">
-    </div>
-    <div class="champ">
-      <label for="toitP">Profondeur du pan (m)</label>
-      <input id="toitP" name="toitP" type="number" inputmode="decimal"
-        min="0" max="200" step="0.1" placeholder="6">
-      <p class="indice">Le pan orienté au sud, ou celui qui reçoit le plus de
-        soleil. Laissez vide si vous ne les connaissez pas.</p>
-    </div>`,
-    // Les deux cotes vont ensemble : une seule ne dessine aucun toit.
-    lire: () => ({ L: Number($('toitL')?.value) || 0, P: Number($('toitP')?.value) || 0 }),
     valide: (v) => {
+      // Les deux cotes vont ensemble : une seule ne dessine aucun toit.
       if (!v.L && !v.P) return null; // facultatif, et assumé comme tel
       if (!v.L || !v.P) return 'Indiquez les deux cotes, ou laissez-les vides toutes les deux.';
       if (v.L * v.P < 4) return 'Ce pan paraît trop petit pour porter des panneaux.';
       return null;
     },
-    restaure: (v) => { if ($('toitL')) { $('toitL').value = v.L || ''; $('toitP').value = v.P || ''; } },
+    restaure: (v) => {
+      if ($('pente')) $('pente').value = v.pente ?? 'moyenne';
+      if ($('orientation')) $('orientation').value = v.orientation ?? 'sud';
+      if ($('toitL')) $('toitL').value = v.L || '';
+      if ($('toitP')) $('toitP').value = v.P || '';
+      majOrientation();
+    },
+  },
+  {
+    cle: 'installation',
+    numero: '05',
+    court: 'Installation',
+    titre: 'Comment poser les panneaux ?',
+    aide: 'Le calcul propose la disposition la plus dense. Vous pouvez la '
+      + 'forcer dans un sens — le plan dit aussitôt ce que cela coûte.',
+    champ: () => `<div class="champ">
+      <label for="modulePv">Module</label>
+      <select id="modulePv" name="modulePv">
+        ${MODULES.map((m) => `<option value="${m.id}"${
+          m.defaut ? ' selected' : ''}>${m.nom} — ${m.resume}</option>`).join('')}
+      </select>
+    </div>
+    <div class="cartes-choix serre" id="poses" role="radiogroup" aria-label="Pose des modules">
+      ${POSES.map((p) => `<button type="button" class="carte-choix" role="radio"
+        aria-checked="false" data-pose="${p.id}">
+        <b>${p.nom}</b><span>${p.resume}</span>
+      </button>`).join('')}
+    </div>
+    <p style="margin-top:16px"><button type="button" class="btn or" id="optimiser">
+      <svg viewBox="0 0 24 24"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></svg>
+      Optimiser automatiquement</button></p>
+    <div class="apercu-pose" id="apercuPose" role="status" aria-live="polite"></div>`,
+    lire: () => ({ module: $('modulePv')?.value ?? MODULE_DEFAUT.id, pose: poseChoisie }),
+    valide: () => null,
+    restaure: (v) => {
+      if (v.pose && POSES.some((p) => p.id === v.pose)) poseChoisie = v.pose;
+      if ($('modulePv') && v.module) $('modulePv').value = v.module;
+    },
   },
 ];
 
@@ -383,7 +446,7 @@ let etape = 0;
  * faudrait tout ressaisir — et personne ne ressaisit.
  */
 function memoriser(fini = false) {
-  enregistrer({ etape, fini, reponses });
+  return enregistrer({ etape, fini, reponses });
 }
 
 /** Les clés qu'une simulation peut légitimement contenir. */
@@ -456,15 +519,100 @@ function proposerReprise() {
 /* Affichage                                                           */
 /* ------------------------------------------------------------------ */
 
+/**
+ * LA BARRE DE PROGRESSION — nommée, et non numérotée.
+ *
+ * « 3 sur 5 » ne dit rien de ce qui reste à faire, et un visiteur qui ignore
+ * ce qui l'attend abandonne. « 04 Toiture » se lit d'un coup d'œil : il sait
+ * où il en est, ce qu'il a déjà donné, et ce qu'on lui demandera encore.
+ *
+ * Les étapes franchies sont cliquables : revenir corriger un chiffre ne doit
+ * pas coûter quatre clics sur « Retour ».
+ */
+const COCHE = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" '
+  + 'stroke="currentColor" stroke-width="3.4" stroke-linecap="round" '
+  + 'stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
 function dessinerJauge() {
-  $('jauge').innerHTML = ETAPES.map((_, i) => {
-    const etat = i < etape ? 'faite' : i === etape ? 'active' : '';
-    const trait = i < ETAPES.length - 1 ? '<span class="trait"></span>' : '';
-    const contenu = i < etape
-      ? '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
-      : String(i + 1);
-    return `<span class="pas ${etat}"><b>${contenu}</b>${trait}</span>`;
+  const pas = ETAPES.map((e, i) => {
+    const etat = i < etape ? 'faite' : i === etape ? 'active' : 'avenir';
+    // Une étape à venir n'est pas cliquable : elle s'appuie sur des réponses
+    // qui n'existent pas encore.
+    const cliquable = i < etape;
+    return `<button type="button" class="pas ${etat}" data-pas="${i}"
+      ${cliquable ? '' : 'disabled'} ${i === etape ? 'aria-current="step"' : ''}>
+      <span class="pas-num">${i < etape ? COCHE : e.numero}</span>
+      <span class="pas-nom">${e.court}</span>
+    </button>`;
   }).join('');
+  const fini = etape >= ETAPES.length;
+  $('jauge').innerHTML = pas + `<button type="button" class="pas ${
+    fini ? 'active' : 'avenir'}" disabled>
+      <span class="pas-num">06</span><span class="pas-nom">Résultats</span>
+    </button>`;
+  $('jauge').setAttribute('aria-label',
+    `Étape ${Math.min(etape + 1, ETAPES.length)} sur ${ETAPES.length + 1}`);
+
+  // Sur un téléphone, six étapes ne tiennent pas dans la largeur : la barre
+  // défile, et sans ce recentrage le visiteur ne verrait jamais où il en est.
+  //
+  // On déplace la barre elle-même plutôt que d'appeler scrollIntoView : ce
+  // dernier fait aussi défiler la page, et glissait la barre sous le bandeau
+  // collant — exactement l'inverse de ce qu'on cherche.
+  const barre = $('jauge');
+  const actif = barre.querySelector('.pas.active');
+  if (actif) {
+    barre.scrollTo({
+      left: actif.offsetLeft - (barre.clientWidth - actif.offsetWidth) / 2,
+      behavior: 'smooth',
+    });
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Sauvegarde continue                                                 */
+/* ------------------------------------------------------------------ */
+
+/** Le dernier enregistrement annoncé, pour ne pas clignoter à chaque touche. */
+let annonceSauvegarde = 0;
+
+/**
+ * ENREGISTRER PENDANT LA FRAPPE, PAS SEULEMENT À LA VALIDATION.
+ *
+ * Une étape validée était conservée ; une étape en cours de saisie ne l'était
+ * pas. Le visiteur qui tape la moitié de ses chiffres, bascule sur son
+ * application STEG pour lire la seconde moitié, et revient — c'est le
+ * parcours le plus fréquent, pas un cas limite — retrouvait sa saisie effacée
+ * par le navigateur Android qui avait tué l'onglet entre-temps.
+ *
+ * Ce qui est écrit ici n'a pas été validé : c'est assumé. Rien ne peut
+ * atteindre le résultat sans passer la validation à la soumission.
+ */
+function sauvegardeContinue() {
+  const e = ETAPES[etape];
+  if (!e?.lire) return;
+  try { reponses[e.cle] = e.lire(); } catch { return; }
+  if (memoriser()) marquerSauvegarde();
+}
+
+/**
+ * Le témoin « Simulation sauvegardée ».
+ *
+ * Espacé d'au moins une seconde et demie : un témoin qui clignote à chaque
+ * touche inquiète au lieu de rassurer.
+ */
+function marquerSauvegarde() {
+  const marque = $('sauvegarde');
+  if (!marque) return;
+  const maintenant = Date.now();
+  if (maintenant - annonceSauvegarde < 1500) return;
+  annonceSauvegarde = maintenant;
+  marque.hidden = false;
+  marque.classList.remove('vif');
+  // Redémarrer l'animation : sans ce reflow forcé, la classe remise
+  // aussitôt ne relance rien.
+  void marque.offsetWidth;
+  marque.classList.add('vif');
 }
 
 function dessinerEtape() {
@@ -486,6 +634,148 @@ function dessinerEtape() {
   brancherLocalisation();
   brancherOrientation();
   brancherConsommation();
+  brancherBatiment();
+  brancherInstallation();
+  brancherSauvegarde();
+  brancherJauge();
+}
+
+/** Toute frappe dans le formulaire est conservée, sans attendre « Suivant ». */
+function brancherSauvegarde() {
+  const f = $('form');
+  if (!f || f.dataset.sauvegarde === 'oui') return;
+  f.dataset.sauvegarde = 'oui';
+  f.addEventListener('input', sauvegardeContinue);
+  f.addEventListener('change', sauvegardeContinue);
+}
+
+/** Revenir à une étape déjà franchie, d'un seul geste. */
+function brancherJauge() {
+  const j = $('jauge');
+  if (!j || j.dataset.branche === 'oui') return;
+  j.dataset.branche = 'oui';
+  j.addEventListener('click', (ev) => {
+    const pas = ev.target.closest('[data-pas]');
+    if (!pas || pas.disabled) return;
+    const vise = Number(pas.dataset.pas);
+    if (!Number.isInteger(vise) || vise >= etape) return;
+    etape = vise;
+    $('resultat').hidden = true;
+    $('form').hidden = false;
+    dessinerEtape();
+    $('tunnel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+/** Le type de bâtiment : quatre cartes, et ce que chacune change. */
+function brancherBatiment() {
+  const hote = $('batiments');
+  if (!hote) return;
+  const peindre = () => {
+    for (const carte of hote.querySelectorAll('[data-batiment]')) {
+      const actif = carte.dataset.batiment === typeBat;
+      carte.classList.toggle('choisi', actif);
+      carte.setAttribute('aria-checked', String(actif));
+    }
+    const t = typeBatiment(typeBat);
+    if ($('noteBatiment')) $('noteBatiment').textContent = t ? t.note : '';
+  };
+  hote.addEventListener('click', (ev) => {
+    const carte = ev.target.closest('[data-batiment]');
+    if (!carte) return;
+    typeBat = carte.dataset.batiment;
+    reponses.batiment = typeBat;
+    peindre();
+    if (memoriser()) marquerSauvegarde();
+  });
+  peindre();
+}
+
+/**
+ * L'étape Installation : la pose se voit au lieu de se lire.
+ *
+ * Un champ « orientation des modules : portrait/paysage » ne dit rien à
+ * personne. Le plan redessiné à chaque clic, avec le nombre de modules et la
+ * puissance qui bougent, dit tout sans une phrase.
+ */
+function brancherInstallation() {
+  const hote = $('poses');
+  if (!hote) return;
+
+  const peindre = () => {
+    for (const carte of hote.querySelectorAll('[data-pose]')) {
+      const actif = carte.dataset.pose === poseChoisie;
+      carte.classList.toggle('choisi', actif);
+      carte.setAttribute('aria-checked', String(actif));
+    }
+    dessinerApercuPose();
+  };
+
+  hote.addEventListener('click', (ev) => {
+    const carte = ev.target.closest('[data-pose]');
+    if (!carte) return;
+    poseChoisie = carte.dataset.pose;
+    reponses.installation = { module: $('modulePv')?.value, pose: poseChoisie };
+    peindre();
+    if (memoriser()) marquerSauvegarde();
+  });
+
+  $('modulePv')?.addEventListener('change', () => {
+    reponses.installation = { module: $('modulePv').value, pose: poseChoisie };
+    dessinerApercuPose();
+  });
+
+  $('optimiser')?.addEventListener('click', () => {
+    const { L, P } = cotesToit();
+    const zone = $('apercuPose');
+    if (!L || !P) {
+      zone.innerHTML = '<p class="indice">Revenez à l’étape Toiture pour donner '
+        + 'les cotes du pan : sans elles, il n’y a rien à optimiser.</p>';
+      return;
+    }
+    const meilleur = optimiser(L, P, { modules: MODULES });
+    if (!meilleur) return;
+    poseChoisie = meilleur.pose;
+    if ($('modulePv')) $('modulePv').value = meilleur.module.id;
+    reponses.installation = { module: meilleur.module.id, pose: poseChoisie };
+    peindre();
+    if (memoriser()) marquerSauvegarde();
+  });
+
+  peindre();
+}
+
+/** Le plan du pan tel que les réglages courants le donnent. */
+function dessinerApercuPose() {
+  const zone = $('apercuPose');
+  if (!zone) return;
+  const { L, P } = cotesToit();
+  const mod = moduleParId($('modulePv')?.value);
+  if (!L || !P) {
+    zone.innerHTML = `<p class="indice">Sans les cotes de votre toiture, la
+      disposition ne peut pas être dessinée. L’étude reste possible : elle
+      dimensionnera sur votre consommation, sans contrainte de surface.</p>`;
+    return;
+  }
+  const trace = planCalepinage(L, P, { largeurPx: 520, module: mod, pose: poseChoisie });
+  if (!trace) {
+    zone.innerHTML = `<p class="indice">Aucun module de ce format ne tient sur un
+      pan de ${String(L).replace('.', ',')} × ${String(P).replace('.', ',')} m
+      dans cette pose. Essayez l’autre pose, ou un module plus court.</p>`;
+    return;
+  }
+  const c = trace.plan;
+  const perte = c.alternative && c.alternative > c.nombre ? c.alternative - c.nombre : 0;
+  zone.innerHTML = `<div class="pose-chiffres">
+      <div><b>${c.nombre}</b><span>modules</span></div>
+      <div><b>${mod.puissance}</b><span>Wc chacun</span></div>
+      <div class="fort"><b>${String(c.puissance).replace('.', ',')}</b><span>kWc</span></div>
+    </div>
+    <div class="graphe">${trace.svg}</div>
+    <p class="indice">${c.rangees} rangée${c.rangees > 1 ? 's' : ''} de ${c.colonnes},
+      posés en ${c.orientation}, marges de rive et jeux compris.${
+      perte ? ` Cette pose coûte ${perte} module${perte > 1 ? 's' : ''} par rapport
+      à l’autre sens.` : ''}</p>`;
 }
 
 /** Dit à l'écran ce que l'orientation choisie coûte, avant même le résultat. */
@@ -566,7 +856,20 @@ function donneesEtude() {
     surfaceDisponible: simulation.surface,
     orientation: toit.orientation ?? null,
     pente: toit.pente ?? null,
+    batiment: reponses.batiment ?? TYPE_DEFAUT,
   };
+}
+
+/** Les cotes du pan, quand le visiteur les a données. */
+function cotesToit() {
+  const t = reponses.toit ?? {};
+  return { L: Number(t.L) || 0, P: Number(t.P) || 0 };
+}
+
+/** Le module et la pose retenus à l'étape Installation. */
+function reglagePose() {
+  const i = reponses.installation ?? {};
+  return { module: moduleParId(i.module), pose: i.pose ?? 'auto' };
 }
 
 /** Recalcule l'étude avec les réglages courants. */
@@ -628,7 +931,7 @@ function dessinerScenarios() {
 }
 
 function dessinerResultat() {
-  const toit = reponses.toiture ?? {};
+  const toit = cotesToit();
   simulation = { puissance: null, surface: (toit.L || 0) * (toit.P || 0) };
   const e = etudeCourante();
 
@@ -759,7 +1062,10 @@ function dessinerResultat() {
   rafraichir();
   dessinerDemande(e);
   $('form').hidden = true;
-  $('jauge').hidden = true;
+  // La barre reste : « 06 Résultats » s'allume, et les étapes franchies
+  // restent cliquables pour corriger un chiffre sans tout recommencer.
+  etape = ETAPES.length;
+  dessinerJauge();
   $('resultat').hidden = false;
   $('resultat').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -767,7 +1073,6 @@ function dessinerResultat() {
     etape = 0;
     $('resultat').hidden = true;
     $('form').hidden = false;
-    $('jauge').hidden = false;
     dessinerEtape();
     $('tunnel').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
@@ -830,8 +1135,10 @@ function rafraichir() {
   }
 
   // Le plan du toit, quand le visiteur a donné ses cotes.
-  const toit = reponses.toiture ?? {};
-  const trace = (toit.L && toit.P) ? planCalepinage(toit.L, toit.P, { largeurPx: 560 }) : null;
+  const toit = cotesToit();
+  const reglage = reglagePose();
+  const trace = (toit.L && toit.P)
+    ? planCalepinage(toit.L, toit.P, { largeurPx: 560, ...reglage }) : null;
   $('blocToit').hidden = !trace;
   if (trace) {
     const c = trace.plan;
@@ -839,8 +1146,8 @@ function rafraichir() {
     $('noteToit').textContent = `Sur un pan de ${String(toit.L).replace('.', ',')} × `
       + `${String(toit.P).replace('.', ',')} m, ${c.nombre} modules tiennent en `
       + `${c.rangees} rangée${c.rangees > 1 ? 's' : ''} de ${c.colonnes}, posés en `
-      + `${c.orientation} — soit ${String(c.puissance).replace('.', ',')} kWc au maximum. `
-      + `Marges de rive et jeux entre modules compris.`;
+      + `${c.orientation} — soit ${String(c.puissance).replace('.', ',')} kWc au maximum, `
+      + `en ${reglage.module.nom}. Marges de rive et jeux entre modules compris.`;
   }
 
   $('detail').innerHTML = [
@@ -921,7 +1228,9 @@ function dessinerDemande(etude) {
     $('erreurDemande').textContent = '';
 
     const r = await envoyerAuServeur({
-      client, etude, toiture: reponses.toiture, toit: reponses.toit, gouvernorat: lieu });
+      client, etude, toiture: cotesToit(),
+      toit: { orientation: reponses.toit?.orientation, pente: reponses.toit?.pente },
+      gouvernorat: lieu });
 
     if (r.ok) {
       $('demande').innerHTML = `<div style="margin-top:24px;background:rgba(255,255,255,.08);
