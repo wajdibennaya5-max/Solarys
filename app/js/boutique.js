@@ -36,10 +36,9 @@ export const OFFRES = {
 
 /**
  * Adresse à laquelle un acheteur écrit si sa clé n'arrive pas.
- * Laissée vide volontairement : c'est une donnée personnelle, elle ne doit
- * être publiée que par une décision explicite de son propriétaire.
+ * Publiée par décision explicite de son propriétaire.
  */
-export const CONTACT = '';
+export const CONTACT = 'wajdibennaya5@gmail.com';
 
 /**
  * COMMANDE DIRECTE — vendre sans plateforme de paiement.
@@ -61,7 +60,7 @@ export const CONTACT = '';
  */
 export const COMMANDE = {
   whatsapp: '',
-  courriel: '',
+  courriel: 'wajdibennaya5@gmail.com',
 };
 
 /**

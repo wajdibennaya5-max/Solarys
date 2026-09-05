@@ -7,7 +7,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { OFFRES, ORDRE, CONTACT, estOuverte, boutiqueOuverte } from '../js/boutique.js';
+import { OFFRES, ORDRE, CONTACT, estOuverte, estVendable, boutiqueOuverte } from '../js/boutique.js';
 import { PLANS, makeKey, readKey } from '../js/licence.js';
 
 const formulesConnues = Object.values(PLANS).map((p) => p.id);
@@ -41,7 +41,7 @@ test('chaque offre porte un prix et une unité affichables', () => {
   }
 });
 
-test('un lien vide ferme la vente, un lien renseigné l\'ouvre', () => {
+test('un lien vide ferme le paiement en ligne, un lien renseigné l\'ouvre', () => {
   const vide = { ...OFFRES.perpetual, lien: '' };
   assert.equal(Boolean(vide.lien), false);
   // `estOuverte` lit la configuration réelle : elle doit rester cohérente
@@ -49,7 +49,13 @@ test('un lien vide ferme la vente, un lien renseigné l\'ouvre', () => {
   for (const plan of ORDRE) {
     assert.equal(estOuverte(plan), Boolean(OFFRES[plan].lien));
   }
-  assert.equal(boutiqueOuverte(), ORDRE.some((p) => Boolean(OFFRES[p].lien)));
+});
+
+test('la boutique est ouverte dès qu\'une formule s\'obtient, par quelque moyen', () => {
+  // Un lien de paiement n'est plus la seule porte : une commande directe en
+  // ouvre une aussi. La boutique suit ce que `estVendable` sait réellement
+  // servir, et non le seul paiement en ligne.
+  assert.equal(boutiqueOuverte(), ORDRE.some(estVendable));
 });
 
 test('une formule inconnue n\'est jamais achetable', () => {
@@ -57,9 +63,12 @@ test('une formule inconnue n\'est jamais achetable', () => {
   assert.equal(estOuverte(undefined), false);
 });
 
-test('le contact reste une décision explicite du propriétaire', () => {
-  // Vide par défaut : une adresse personnelle ne se publie pas par accident.
+test('le contact publié est une adresse joignable', () => {
+  // Une adresse personnelle ne se publie que par décision explicite ; une
+  // fois publiée, elle doit au moins être valide — un acheteur bloqué qui
+  // écrit dans le vide est un client perdu.
   assert.equal(typeof CONTACT, 'string');
+  if (CONTACT) assert.match(CONTACT, /^[^@\s]+@[^@\s]+\.[^@\s]+$/);
 });
 
 test('tout lien renseigné est une adresse https', () => {
