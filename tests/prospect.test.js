@@ -100,3 +100,67 @@ test('la demande s\'écrit en français, sans point décimal ni fausse précisio
   assert.match(t, /7,4 ans/);
   assert.doesNotMatch(t, /,000 DT/, 'aucun montant estimé au millime près');
 });
+
+/* ------------------------------------------------------------------ */
+/* L'envoi au serveur                                                  */
+/* ------------------------------------------------------------------ */
+
+test('les chiffres transmis sont ceux que le visiteur a vus', async () => {
+  const { chiffresEtude } = await import('../js/prospect.js');
+  const c = chiffresEtude(ETUDE, { L: 8, P: 6 });
+  assert.equal(c.puissance, ETUDE.puissance);
+  assert.equal(c.consommation, ETUDE.consommation);
+  assert.deepEqual(c.toiture, { largeur: 8, profondeur: 6 });
+  // Les montants partent arrondis : « 1014,7499 DT » dans un courriel ferait
+  // douter de tout le reste.
+  assert.equal(c.economieAnnuelle, Math.round(ETUDE.economieAnnuelle));
+  assert.equal(c.cout, Math.round(ETUDE.cout));
+});
+
+test('sans cotes de toiture, aucune toiture n\'est inventée', async () => {
+  const { chiffresEtude } = await import('../js/prospect.js');
+  assert.equal(chiffresEtude(ETUDE, {}).toiture, undefined);
+  assert.equal(chiffresEtude(ETUDE, { L: 8 }).toiture, undefined, 'une cote seule ne suffit pas');
+});
+
+test('un projet sans retour transmet null, jamais un nombre inventé', async () => {
+  const { chiffresEtude } = await import('../js/prospect.js');
+  assert.equal(chiffresEtude({ ...ETUDE, retour: null }, {}).retour, null);
+});
+
+test('un serveur injoignable est signalé, sans planter', async () => {
+  const m = await import(`../js/prospect.js?reseau=${Math.random()}`);
+  const initial = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => { throw new Error('hors ligne'); };
+    const r = await m.envoyerAuServeur({
+      client: { nom: 'X', telephone: '20123456' }, etude: ETUDE, toiture: {} });
+    assert.deepEqual(r, { ok: false, message: 'Serveur injoignable.' });
+  } finally { globalThis.fetch = initial; }
+});
+
+test('un refus du serveur nomme le champ fautif', async () => {
+  const m = await import(`../js/prospect.js?refus=${Math.random()}`);
+  const initial = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => ({
+      ok: false,
+      json: async () => ({ error: 'Données invalides', fields: { 'etude.puissance': 'Trop grande' } }),
+    });
+    const r = await m.envoyerAuServeur({
+      client: { nom: 'X', telephone: '20123456' }, etude: ETUDE, toiture: {} });
+    assert.equal(r.ok, false);
+    assert.equal(r.message, 'Trop grande');
+  } finally { globalThis.fetch = initial; }
+});
+
+test('une demande acceptée rend sa référence', async () => {
+  const m = await import(`../js/prospect.js?ok=${Math.random()}`);
+  const initial = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => ({ ok: true, json: async () => ({ reference: 'WT-0509-1976' }) });
+    const r = await m.envoyerAuServeur({
+      client: { nom: 'X', telephone: '20123456' }, etude: ETUDE, toiture: {} });
+    assert.deepEqual(r, { ok: true, reference: 'WT-0509-1976' });
+  } finally { globalThis.fetch = initial; }
+});

@@ -26,6 +26,67 @@ export const CONTACT = {
 };
 
 /**
+ * Le service qui reçoit les demandes, sur votre serveur.
+ *
+ * Vide, la demande part sur WhatsApp comme avant. Renseigné, elle est
+ * enregistrée, apparaît dans votre console d'administration, et déclenche les
+ * deux courriels — le vôtre et celui du client.
+ *
+ * WHATSAPP RESTE LE FILET : si le serveur ne répond pas — téléphone éteint,
+ * tunnel tombé, réseau coupé —, la demande bascule sur WhatsApp au lieu de se
+ * perdre. Un prospect ne doit jamais disparaître parce qu'une machine dormait.
+ */
+export const API = 'https://20122011.xyz/api/etude';
+
+/** Les chiffres transmis au serveur : ceux que le visiteur a sous les yeux. */
+export function chiffresEtude(etude, toiture) {
+  return {
+    consommation: etude.consommation,
+    prixKwh: Number(etude.prixKwh.toFixed(4)),
+    puissance: etude.puissance,
+    modules: etude.modules,
+    surface: etude.surface,
+    production: etude.production,
+    // Arrondis avant de partir : « 1014,7499 DT » dans un courriel ferait
+    // douter de tout le reste.
+    economieAnnuelle: Math.round(etude.economieAnnuelle),
+    cout: Math.round(etude.cout),
+    retour: etude.retour === null ? null : Number(etude.retour.toFixed(2)),
+    ...(toiture?.L && toiture?.P
+      ? { toiture: { largeur: toiture.L, profondeur: toiture.P } }
+      : {}),
+  };
+}
+
+/**
+ * Envoie la demande au serveur.
+ * @returns {Promise<{ok:true, reference:string}|{ok:false, message:string}>}
+ */
+export async function envoyerAuServeur({ client, etude, toiture, gouvernorat }) {
+  if (!API) return { ok: false, message: 'Aucun serveur configuré.' };
+  try {
+    const r = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: client.nom,
+        phone: client.telephone,
+        email: client.courriel || '',
+        area: gouvernorat || '',
+        etude: chiffresEtude(etude, toiture),
+      }),
+    });
+    const corps = await r.json().catch(() => ({}));
+    if (r.ok && corps.reference) return { ok: true, reference: corps.reference };
+    // Un champ refusé se dit précisément : le visiteur doit savoir quoi corriger.
+    const champ = corps.fields && Object.values(corps.fields)[0];
+    return { ok: false, message: champ || corps.error || 'Le serveur a refusé la demande.' };
+  } catch {
+    return { ok: false, message: 'Serveur injoignable.' };
+  }
+}
+
+/**
  * L'étude détaillée, celle qui se vend.
  *
  * L'estimation en ligne est gratuite et le restera : c'est elle qui donne

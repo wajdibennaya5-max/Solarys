@@ -11,8 +11,8 @@ import { formater, formaterRond } from './prix.js';
 import { localiser, REFUS } from './geo.js';
 import { planCalepinage } from './calepinage.js';
 import { construireGraphe } from './graphe.js';
-import { OFFRE, CONTACT, ouverte, redigerDemande, lienDemande, champsManquants }
-  from './prospect.js';
+import { OFFRE, CONTACT, ouverte, redigerDemande, lienDemande, champsManquants,
+  envoyerAuServeur, API } from './prospect.js';
 
 const $ = (id) => document.getElementById(id);
 const reponses = {};
@@ -395,25 +395,67 @@ function dessinerDemande(etude) {
       <input id="telephone" name="telephone" type="tel" inputmode="tel"
         autocomplete="tel" placeholder="20 123 456">
     </div>
+    <div class="champ">
+      <label for="courriel" style="color:#fff">Votre courriel — facultatif</label>
+      <input id="courriel" name="courriel" type="email" inputmode="email"
+        autocomplete="email" placeholder="pour recevoir votre étude par écrit">
+    </div>
     <p class="erreur" id="erreurDemande" role="alert" aria-live="polite"
       style="color:#ffd0c6"></p>
     <button class="btn primaire large" type="button" id="commander">
       Demander l’étude détaillée</button>
     <p style="margin-top:14px;font-size:13.5px;color:rgba(255,255,255,.6)">
-      Vous serez dirigé vers WhatsApp, avec votre estimation déjà écrite.
-      Joignez-y la photo de votre facture STEG.</p>`;
+      Votre demande nous parvient directement. Laissez votre courriel pour
+      recevoir l’étude par écrit.</p>`;
 
-  $('commander').addEventListener('click', () => {
-    const client = { nom: $('nom').value, telephone: $('telephone').value };
+  $('commander').addEventListener('click', async () => {
+    const bouton = $('commander');
+    const client = {
+      nom: $('nom').value,
+      telephone: $('telephone').value,
+      courriel: $('courriel')?.value ?? '',
+    };
     const manque = champsManquants(client);
     if (manque.length) {
       $('erreurDemande').textContent = `Indiquez ${manque.join(' et ')}.`;
       return;
     }
-    const texte = redigerDemande({
-      etude, client, gouvernorat: nomGouvernorat(reponses.gouvernorat) });
-    const lien = lienDemande(texte);
-    if (lien) window.open(lien, '_blank', 'noopener');
+
+    const lieu = nomGouvernorat(reponses.gouvernorat);
+    const versWhatsApp = () => {
+      const lien = lienDemande(redigerDemande({ etude, client, gouvernorat: lieu }));
+      if (lien) window.open(lien, '_blank', 'noopener');
+    };
+
+    // Sans serveur configuré, on garde le chemin d'avant, sans détour.
+    if (!API) { versWhatsApp(); return; }
+
+    bouton.disabled = true;
+    bouton.textContent = 'Envoi…';
+    $('erreurDemande').textContent = '';
+
+    const r = await envoyerAuServeur({
+      client, etude, toiture: reponses.toiture, gouvernorat: lieu });
+
+    if (r.ok) {
+      $('demande').innerHTML = `<div style="margin-top:24px;background:rgba(255,255,255,.08);
+        border-radius:14px;padding:22px">
+        <div style="font-size:19px;font-weight:800;color:#fff">Demande enregistrée</div>
+        <p style="color:rgba(255,255,255,.8);margin-top:8px">Votre référence :
+          <b style="color:var(--or)">${r.reference}</b>. Nous vous rappelons
+          rapidement${client.courriel ? ', et votre étude part par courriel' : ''}.</p>
+        <p style="margin-top:16px"><a class="btn" href="${lienDemande(
+          redigerDemande({ etude, client, gouvernorat: lieu, payante: false }))}"
+          target="_blank" rel="noopener">Nous écrire sur WhatsApp</a></p>
+      </div>`;
+      return;
+    }
+
+    // Le serveur n'a pas répondu, ou a refusé : on ne perd pas le prospect.
+    bouton.disabled = false;
+    bouton.textContent = 'Demander l’étude détaillée';
+    $('erreurDemande').textContent = `${r.message} Votre demande part sur WhatsApp.`;
+    versWhatsApp();
   });
 }
 
