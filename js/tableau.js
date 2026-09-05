@@ -157,3 +157,67 @@ export const ICONES = {
   courbe: '<svg class="kpi-ic" viewBox="0 0 24 24"><path d="M3 17l5.5-6 4 3.5L21 6"/><path d="M15 6h6v6"/></svg>',
   feuille: '<svg class="kpi-ic" viewBox="0 0 24 24"><path d="M20 4C10 4 4 9 4 16c0 2 .6 3.4.6 3.4S9 12 20 10c0 0-3 8-10 9"/><path d="M4 20c0-4 3-7 7-8"/></svg>',
 };
+
+/**
+ * LE PANNEAU TECHNICIEN — replié par défaut, complet une fois ouvert.
+ *
+ * Le client veut savoir combien il économise ; l'installateur veut savoir si
+ * la chaîne tient la tension un matin de janvier. Deux métiers, deux
+ * lectures. Cacher le second derrière un dépli sert les deux : le client
+ * n'est pas noyé, le professionnel trouve tout au même endroit.
+ */
+export function panneauTechnique(dim, verdict) {
+  if (!dim) return '';
+  const v = { conforme: '✓', verifier: '⚠', hors: '✕' };
+  const nb = (n, d = 0) => n.toLocaleString('fr-FR',
+    { minimumFractionDigits: d, maximumFractionDigits: d });
+
+  const lignes = [
+    ['Module', `${dim.module.nom} — ${dim.module.puissance} Wc`],
+    ['Onduleur', `${dim.onduleur.nom} — ${dim.onduleur.mppt} MPPT`],
+    ['Champ', `${dim.chaines} chaîne${dim.chaines > 1 ? 's' : ''} de ${
+      dim.longueur} modules, soit ${dim.modules} modules`],
+    ['Puissance DC', `${nb(dim.puissanceDc, 2)} kWc`],
+    ['Puissance AC', `${nb(dim.puissanceAc)} kW`],
+    ['Rapport DC/AC', nb(dim.ratio, 2)],
+    ['Tension à vide, modules froids', `${nb(dim.vocChaine)} V`],
+    ['Tension MPP, conditions standard', `${nb(dim.vmpChaineStc)} V`],
+    ['Tension MPP, cellule à 70 °C', `${nb(dim.vmpChaineChaud)} V`],
+    ['Courant de fonctionnement par MPPT', `${nb(dim.courantFonctionnement, 1)} A`],
+    ['Courant de court-circuit majoré', `${nb(dim.courantCourtCircuit, 1)} A`],
+    ['Longueurs de chaîne admissibles', `${dim.bornes.min} à ${dim.bornes.max} modules`],
+  ];
+
+  return `<details class="technique" id="technique">
+    <summary>
+      <span class="tq-titre">Mode technicien — dimensionnement électrique</span>
+      <span class="tq-verdict tq-${verdict}">${v[verdict]} ${
+        verdict === 'conforme' ? 'Conforme' : verdict === 'verifier' ? 'À vérifier'
+          : 'Hors limites'}</span>
+    </summary>
+
+    <div class="tq-controles">
+      ${dim.controles.map((c) => `<div class="tq-c tq-${c.verdict}">
+        <div class="tq-c-tete">
+          <span class="tq-c-signe">${v[c.verdict]}</span>
+          <span class="tq-c-nom">${c.nom}</span>
+          <span class="tq-c-val">${c.mesure}</span>
+        </div>
+        <p class="tq-c-lim">${c.limite}</p>
+        <p class="tq-c-txt">${c.pourquoi}</p>
+      </div>`).join('')}
+    </div>
+
+    <table class="tq-table">
+      <caption>Paramètres retenus</caption>
+      <tbody>${lignes.map(([k, val]) => `<tr><th scope="row">${k}</th>
+        <td>${val}</td></tr>`).join('')}</tbody>
+    </table>
+
+    <p class="tq-note">Les limites viennent du catalogue de matériel du site,
+      non d’une fiche constructeur signée, et les températures de
+      dimensionnement sont celles retenues pour le climat tunisien
+      (${dim.module.coeffVoc} %/°C sur la tension à vide). Un site d’altitude
+      descend plus bas : vérifiez la température minimale avant de commander.</p>
+  </details>`;
+}

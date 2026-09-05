@@ -449,6 +449,47 @@ input:focus-visible,select:focus-visible{outline:none;border-color:var(--argile)
 .fx-trait.fx-achat{stroke:var(--argile);color:var(--argile);stroke-dasharray:6 5}
 .fx-note{font-family:var(--texte);font-size:11.5px;font-weight:700;fill:var(--encre-2)}
 
+/* ── Mode technicien ─────────────────────────────────────────────── */
+.technique{margin-top:22px;border:1.5px solid var(--bord);border-radius:14px;
+  background:var(--fond);overflow:hidden}
+.technique summary{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  flex-wrap:wrap;cursor:pointer;padding:14px 16px;list-style:none;background:var(--douce)}
+.technique summary::-webkit-details-marker{display:none}
+.tq-titre{font-size:13.5px;font-weight:800;color:var(--nuit)}
+.tq-titre::before{content:'+ ';color:var(--argile)}
+.technique[open] .tq-titre::before{content:'– '}
+.tq-verdict{font-size:11.5px;font-weight:800;letter-spacing:.04em;border-radius:99px;
+  padding:4px 11px;white-space:nowrap}
+.tq-verdict.tq-conforme{background:#e4f2e8;color:#2f6b43}
+.tq-verdict.tq-verifier{background:#fdf1e4;color:#8a5a1c}
+.tq-verdict.tq-hors{background:#fbe6e1;color:#9c3418}
+.tq-controles{display:grid;gap:10px;padding:16px}
+.tq-c{border-left:3px solid var(--bord);border-radius:0 10px 10px 0;padding:11px 13px;
+  background:var(--surface)}
+.tq-c.tq-conforme{border-left-color:#4d9166}
+.tq-c.tq-verifier{border-left-color:var(--or)}
+.tq-c.tq-hors{border-left-color:var(--argile);background:#fdf6f4}
+.tq-c-tete{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.tq-c-signe{font-weight:800;font-size:14px}
+.tq-c.tq-conforme .tq-c-signe{color:#2f6b43}
+.tq-c.tq-verifier .tq-c-signe{color:#8a5a1c}
+.tq-c.tq-hors .tq-c-signe{color:#9c3418}
+.tq-c-nom{flex:1;min-width:150px;font-size:13.5px;font-weight:700;color:var(--nuit)}
+.tq-c-val{font-family:var(--titre);font-size:15px;font-weight:800;color:var(--nuit);
+  font-variant-numeric:tabular-nums}
+.tq-c-lim{font-size:12px;color:var(--encre-3);margin-top:2px}
+.tq-c-txt{font-size:12.5px;color:var(--encre-2);line-height:1.5;margin-top:6px}
+.tq-table{width:100%;border-collapse:collapse;margin:4px 16px 16px;
+  width:calc(100% - 32px);font-size:13px}
+.tq-table caption{text-align:left;font-size:11.5px;font-weight:800;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--encre-3);padding-bottom:8px}
+.tq-table th,.tq-table td{border-top:1px solid var(--bord);padding:8px 0;text-align:left;
+  vertical-align:top}
+.tq-table th{font-weight:600;color:var(--encre-2);width:56%}
+.tq-table td{font-weight:800;color:var(--nuit);text-align:right;
+  font-variant-numeric:tabular-nums}
+.tq-note{font-size:12px;color:var(--encre-3);line-height:1.55;padding:0 16px 16px}
+
 /* Le squelette de chargement. */
 .squelette{display:flex;flex-direction:column;gap:10px;padding:6px 0}
 .squelette span{height:13px;border-radius:7px;

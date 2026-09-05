@@ -19,8 +19,9 @@ import { QUESTIONS } from './profil.js';
 import { TYPES, typeBatiment, TYPE_DEFAUT, consommationMensuelle } from './batiment.js';
 import { MODULES, MODULE_DEFAUT, moduleParId } from './materiel.js';
 import { POSES, optimiser } from './calepinage.js';
-import { carteCentrale, grilleKpi, carteScore, avertissement, phraseCo2 }
-  from './tableau.js';
+import { carteCentrale, grilleKpi, carteScore, avertissement, phraseCo2,
+  panneauTechnique } from './tableau.js';
+import { dimensionner, verdictGlobal } from './technique.js';
 import { evaluer } from './score.js';
 import { animerChiffres, compter, mouvementReduit } from './anime.js';
 import { tousLesCas, DUREE as DUREE_VITRE } from './heros.js';
@@ -1028,6 +1029,7 @@ function dessinerResultat() {
     <div class="bloc">
       <h4>Le détail</h4>
       <dl id="detail"></dl>
+      <div id="panneauTechnique"></div>
       <div id="avertissement"></div>
     </div>
 
@@ -1217,6 +1219,16 @@ function rafraichir() {
       + `${c.orientation} — soit ${String(c.puissance).replace('.', ',')} kWc au maximum, `
       + `en ${reglage.module.nom}. Marges de rive et jeux entre modules compris.`;
   }
+
+  // Le dimensionnement électrique, replié : le client n'en a pas besoin,
+  // l'installateur ne doit pas avoir à le redemander.
+  const dim = dimensionner({ puissance: e.puissance, module: reglagePose().module });
+  const ouvertAvant = $('technique')?.open === true;
+  $('panneauTechnique').innerHTML = dim
+    ? panneauTechnique(dim, verdictGlobal(dim.controles)) : '';
+  // Un curseur déplacé ne doit pas refermer le panneau qu'on était en train
+  // de lire.
+  if (ouvertAvant && $('technique')) $('technique').open = true;
 
   $('avertissement').innerHTML = avertissement(e, HYPOTHESES);
 

@@ -83,24 +83,34 @@ export const moduleParId = (id) => MODULES.find((m) => m.id === id) ?? MODULE_DE
  *
  * `vMpptMin` et `vMpptMax` bornent la plage où l'onduleur sait suivre le
  * point de puissance ; `vMax` est la tension à ne jamais dépasser, sous
- * peine de destruction. `iMpptMax` borne le courant d'une entrée, donc le
- * nombre de chaînes qu'on peut y mettre en parallèle.
+ * peine de destruction.
+ *
+ * DEUX COURANTS, ET NON UN SEUL — la confusion la plus coûteuse du
+ * dimensionnement. `iMpptMax` est le courant de FONCTIONNEMENT maximal d'une
+ * entrée : il se compare au courant au point de puissance (Imp) des chaînes
+ * en parallèle. `iScMax` est le courant de COURT-CIRCUIT admissible, plus
+ * élevé : il se compare à l'Isc majoré d'une marge de surirradiance.
+ * Comparer l'Isc majoré au seul `iMpptMax` déclare hors limites des
+ * installations parfaitement saines — c'est l'erreur que ce commentaire
+ * existe pour empêcher.
  */
 export const ONDULEURS = [
-  { id: 'ond-3', nom: '3 kW monophasé', puissance: 3, phases: 1,
-    mppt: 2, chainesParMppt: 1, vMax: 600, vMpptMin: 90, vMpptMax: 520, iMpptMax: 13 },
-  { id: 'ond-5', nom: '5 kW monophasé', puissance: 5, phases: 1,
-    mppt: 2, chainesParMppt: 1, vMax: 600, vMpptMin: 90, vMpptMax: 520, iMpptMax: 13 },
-  { id: 'ond-6', nom: '6 kW triphasé', puissance: 6, phases: 3,
-    mppt: 2, chainesParMppt: 1, vMax: 1000, vMpptMin: 200, vMpptMax: 850, iMpptMax: 16 },
-  { id: 'ond-10', nom: '10 kW triphasé', puissance: 10, phases: 3,
-    mppt: 2, chainesParMppt: 2, vMax: 1000, vMpptMin: 200, vMpptMax: 850, iMpptMax: 16 },
-  { id: 'ond-15', nom: '15 kW triphasé', puissance: 15, phases: 3,
-    mppt: 2, chainesParMppt: 2, vMax: 1000, vMpptMin: 200, vMpptMax: 850, iMpptMax: 16 },
-  { id: 'ond-20', nom: '20 kW triphasé', puissance: 20, phases: 3,
-    mppt: 3, chainesParMppt: 2, vMax: 1100, vMpptMin: 200, vMpptMax: 950, iMpptMax: 16 },
-  { id: 'ond-30', nom: '30 kW triphasé', puissance: 30, phases: 3,
-    mppt: 3, chainesParMppt: 2, vMax: 1100, vMpptMin: 200, vMpptMax: 950, iMpptMax: 20 },
+  { id: 'ond-2', nom: '2 kW monophasé', puissance: 2, phases: 1, mppt: 1,
+    chainesParMppt: 1, vMax: 600, vMpptMin: 90, vMpptMax: 500, iMpptMax: 15, iScMax: 20 },
+  { id: 'ond-3', nom: '3 kW monophasé', puissance: 3, phases: 1, mppt: 2,
+    chainesParMppt: 1, vMax: 600, vMpptMin: 90, vMpptMax: 520, iMpptMax: 15, iScMax: 20 },
+  { id: 'ond-5', nom: '5 kW monophasé', puissance: 5, phases: 1, mppt: 2,
+    chainesParMppt: 1, vMax: 600, vMpptMin: 90, vMpptMax: 520, iMpptMax: 15, iScMax: 20 },
+  { id: 'ond-6', nom: '6 kW triphasé', puissance: 6, phases: 3, mppt: 2,
+    chainesParMppt: 1, vMax: 1000, vMpptMin: 200, vMpptMax: 850, iMpptMax: 16, iScMax: 22 },
+  { id: 'ond-10', nom: '10 kW triphasé', puissance: 10, phases: 3, mppt: 2,
+    chainesParMppt: 2, vMax: 1000, vMpptMin: 200, vMpptMax: 850, iMpptMax: 16, iScMax: 22 },
+  { id: 'ond-15', nom: '15 kW triphasé', puissance: 15, phases: 3, mppt: 2,
+    chainesParMppt: 2, vMax: 1000, vMpptMin: 200, vMpptMax: 850, iMpptMax: 16, iScMax: 22 },
+  { id: 'ond-20', nom: '20 kW triphasé', puissance: 20, phases: 3, mppt: 3,
+    chainesParMppt: 2, vMax: 1100, vMpptMin: 200, vMpptMax: 950, iMpptMax: 20, iScMax: 30 },
+  { id: 'ond-30', nom: '30 kW triphasé', puissance: 30, phases: 3, mppt: 3,
+    chainesParMppt: 2, vMax: 1100, vMpptMin: 200, vMpptMax: 950, iMpptMax: 20, iScMax: 30 },
 ];
 
 export const onduleurParId = (id) => ONDULEURS.find((o) => o.id === id) ?? null;
@@ -140,13 +150,30 @@ export function vmpA(mod, temperature) {
   return m.vmp * (1 + (m.coeffVoc / 100) * ecart);
 }
 
-/** L'onduleur le plus juste pour une puissance crête donnée. */
+/**
+ * L'onduleur le plus juste pour une puissance crête donnée.
+ *
+ * On vise un champ légèrement plus gros que l'onduleur : les conditions
+ * standard ne sont presque jamais atteintes, et un onduleur trop grand
+ * travaille à faible charge, là où son rendement est le plus mauvais.
+ *
+ * On choisit donc le RATIO le plus proche de la cible, et non le premier
+ * onduleur assez gros — prendre le premier donnait un 5 kW sur un champ de
+ * 4 kWc, soit un rapport de 0,77 que le contrôle rejetait aussitôt.
+ */
 export function onduleurPour(puissanceKwc, { ratioVise = 1.15 } = {}) {
   const kwc = Number(puissanceKwc);
   if (!(kwc > 0)) return null;
-  // On surdimensionne légèrement le champ par rapport à l'onduleur : les
-  // conditions STC ne sont presque jamais atteintes, et un onduleur trop
-  // grand travaille mal à faible charge.
-  const cible = kwc / ratioVise;
-  return ONDULEURS.find((o) => o.puissance >= cible) ?? ONDULEURS.at(-1);
+  // Un rapport DANS la plage saine l'emporte toujours sur un rapport hors
+  // plage, même plus proche de la cible en valeur absolue.
+  const BAS = 0.95; const HAUT = 1.35;
+  let meilleur = null;
+  let scoreMin = Infinity;
+  for (const o of ONDULEURS) {
+    const r = kwc / o.puissance;
+    const dehors = r < BAS ? BAS - r : r > HAUT ? r - HAUT : 0;
+    const score = dehors * 100 + Math.abs(r - ratioVise);
+    if (score < scoreMin) { scoreMin = score; meilleur = o; }
+  }
+  return meilleur;
 }
