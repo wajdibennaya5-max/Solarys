@@ -50,9 +50,14 @@ jobs:
         run: |
           mkdir -p _site
           # Tout le dépôt est publiable, sauf l'outillage de développement.
+          # `tools/` est l'outillage du vendeur, pas du site : il n'a rien à
+          # faire sur la vitrine. Cela ne change rien au modèle de sécurité —
+          # `makeKey` est de toute façon livré dans app/js/licence.js, qui le
+          # dit lui-même : la licence est une commodité, pas une protection.
           rsync -a --exclude '/_site' --exclude '.git' --exclude '.github' \
                    --exclude 'app/tests' --exclude 'app/package.json' \
                    --exclude 'app/node_modules' --exclude 'app/README.md' \
+                   --exclude 'tools' --exclude 'docs' \
                    ./ _site/
           touch _site/.nojekyll
           echo "Contenu publié :"
