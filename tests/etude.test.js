@@ -165,3 +165,20 @@ test('la couverture ne dépasse jamais cent pour cent', () => {
   const e = etudier({ ...FOYER, puissance: PUISSANCE.max });
   assert.ok(e.couverture <= 1);
 });
+
+test('une toiture contraignante ne fait jamais dépasser sa capacité', () => {
+  // 20 m² portent 20/6 = 3,33 kWc. Arrondir au plus proche donnerait 3,5 —
+  // une installation qui ne tient pas sur le toit, et un client fâché le
+  // jour de la pose.
+  const max = 20 / HYPOTHESES.surfaceParKwc;
+  const kwc = puissanceRecommandee({ ...FOYER, surfaceDisponible: 20 });
+  assert.ok(kwc <= max, `${kwc} kWc ne tiennent pas sur 20 m² (max ${max.toFixed(2)})`);
+  // Et la surface annoncée doit rester dans la toiture disponible.
+  const e = etudier({ ...FOYER, surfaceDisponible: 20 });
+  assert.ok(e.surface <= 20, `surface annoncée ${e.surface} m² > 20 m² disponibles`);
+});
+
+test('sans contrainte de toiture, l\'arrondi reste au plus proche', () => {
+  // 4800 kWh à Sfax donnent 2,93 kWc : sans toit contraignant, 3,0 est juste.
+  assert.equal(puissanceRecommandee(FOYER), 3);
+});

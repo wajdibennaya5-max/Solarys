@@ -6,8 +6,10 @@
  * c'est ce qu'elle doit faire — aucune requête, aucun mouchard.
  */
 import { GOUVERNORATS, nomGouvernorat, zoneSolaire } from './gisement.js';
-import { etudier, HYPOTHESES } from './etude.js';
+import { etudier, HYPOTHESES, PUISSANCE } from './etude.js';
 import { formater, formaterRond } from './prix.js';
+import { localiser, REFUS } from './geo.js';
+import { construireGraphe } from './graphe.js';
 import { OFFRE, CONTACT, ouverte, redigerDemande, lienDemande, champsManquants }
   from './prospect.js';
 
@@ -25,7 +27,14 @@ const ETAPES = [
     cle: 'gouvernorat',
     titre: 'Où se trouve votre logement ?',
     aide: 'Le soleil de Tozeur n’est pas celui de Bizerte : le calcul en tient compte.',
-    champ: () => `<div class="champ">
+    champ: () => `<div class="geo">
+      <button class="btn" type="button" id="localiser">
+        <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Me localiser
+      </button>
+    </div>
+    <p class="indice" id="geoEtat" role="status" aria-live="polite"></p>
+    <div class="champ">
       <label for="gouvernorat">Gouvernorat</label>
       <select id="gouvernorat" name="gouvernorat">
         <option value="">Choisissez…</option>
@@ -124,6 +133,32 @@ function dessinerEtape() {
     if (reponses[e.cle] !== undefined) saisi.value = reponses[e.cle];
     saisi.focus({ preventScroll: true });
   }
+  brancherLocalisation();
+}
+
+/**
+ * La localisation automatique — proposée, jamais imposée.
+ *
+ * Elle fait gagner un geste, mais elle approxime : à la frontière de deux
+ * gouvernorats elle peut se tromper d'une case. Le résultat est donc
+ * pré-sélectionné dans la liste, où il reste modifiable d'un geste.
+ */
+function brancherLocalisation() {
+  const bouton = $('localiser');
+  if (!bouton) return;
+  bouton.addEventListener('click', async () => {
+    const etat = $('geoEtat');
+    bouton.disabled = true;
+    etat.textContent = 'Recherche de votre position…';
+    const r = await localiser();
+    bouton.disabled = false;
+    if (!r.ok) { etat.textContent = REFUS[r.raison]; return; }
+    const liste = $('gouvernorat');
+    liste.value = r.id;
+    reponses.gouvernorat = r.id;
+    etat.textContent = `Vous semblez être à ${nomGouvernorat(r.id)}.`
+      + ' Corrigez ci-dessous si ce n’est pas le bon gouvernorat.';
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -135,44 +170,66 @@ function chiffre(valeur, libelle, fort = false) {
     <span class="v">${valeur}</span><span class="l">${libelle}</span></div>`;
 }
 
-function dessinerResultat() {
-  const e = etudier({
+/** L'état de la simulation : ce que le visiteur a déplacé lui-même. */
+let simulation = { puissance: null, surface: 0 };
+
+/** Recalcule l'étude avec les réglages courants. */
+function etudeCourante() {
+  return etudier({
     consommationAnnuelle: Number(reponses.consommation),
     montantAnnuel: Number(reponses.montant),
     gouvernorat: reponses.gouvernorat,
-    surfaceDisponible: Number(reponses.surface) || 0,
+    surfaceDisponible: simulation.surface,
+    puissance: simulation.puissance,
   });
+}
+
+function dessinerResultat() {
+  simulation = { puissance: null, surface: Number(reponses.surface) || 0 };
+  const e = etudeCourante();
 
   // Une étude incomplète ne s'affiche pas à moitié.
   if (!e) {
     $('erreur').textContent = 'Ces chiffres ne permettent pas de conclure. Vérifiez votre saisie.';
     return;
   }
-
-  const lieu = nomGouvernorat(reponses.gouvernorat);
-  const couverture = Math.round(e.couverture * 100);
+  simulation.puissance = e.puissance;
 
   $('resultat').innerHTML = `
-    <h3 style="text-align:center;font-size:26px;margin-bottom:8px">
-      Votre installation : ${e.puissance} kWc</h3>
-    <p class="sous-titre" style="margin-bottom:0">À ${lieu}, ${e.modules} modules
-      sur environ ${e.surface} m² couvriraient ${couverture} % de votre consommation.</p>
+    <h3 style="text-align:center;font-size:27px;margin-bottom:9px" id="titreRes"></h3>
+    <p class="sous-titre" style="margin-bottom:0" id="sousRes"></p>
 
-    <div class="chiffres">
-      ${chiffre(formaterRond(e.economieMensuelle), 'économie / mois', true)}
-      ${chiffre(e.retour ? e.retour.toFixed(1).replace('.', ',') + ' ans' : '—', 'retour sur investissement')}
-      ${chiffre(formaterRond(e.cout), 'coût estimé')}
-      ${chiffre(formaterRond(e.gainNet), 'gain net sur 25 ans')}
+    <div class="chiffres" id="chiffres"></div>
+
+    <div class="bloc">
+      <h4>Quand l’installation se rembourse</h4>
+      <p class="note">L’économie s’accumule année après année ; l’électricité
+        renchérit, les modules s’usent un peu. La ligne pointillée est ce que
+        l’installation a coûté.</p>
+      <div class="graphe" id="graphe"></div>
     </div>
 
-    <div class="detail">
-      <dl>
-        <dt>Ce que vous payez le kilowattheure</dt><dd>${e.prixKwh.toFixed(3).replace('.', ',')} DT</dd>
-        <dt>Production estimée</dt><dd>${e.production.toLocaleString('fr')} kWh / an</dd>
-        <dt>Zone solaire (${lieu})</dt><dd>${zoneSolaire(reponses.gouvernorat)} — ${e.productible} kWh/kWc</dd>
-        <dt>Consommé sur place / injecté</dt><dd>${e.autoconsomme.toLocaleString('fr')} / ${e.surplus.toLocaleString('fr')} kWh</dd>
-        <dt>Économie la première année</dt><dd>${formater(e.economieAnnuelle)}</dd>
-      </dl>
+    <div class="bloc">
+      <h4>Ajustez, et regardez ce que ça change</h4>
+      <p class="note">Rien n’est figé : votre toiture, votre budget, vos envies.
+        Les chiffres et la courbe suivent.</p>
+      <div class="curseurs">
+        <div class="curseur">
+          <div class="tete"><span>Puissance installée</span><b id="vPuissance"></b></div>
+          <input type="range" id="cPuissance" aria-label="Puissance installée en kilowatts-crête">
+        </div>
+        <div class="curseur">
+          <div class="tete"><span>Toiture disponible</span><b id="vSurface"></b></div>
+          <input type="range" id="cSurface" min="0" max="200" step="5"
+            aria-label="Surface de toiture disponible en mètres carrés">
+        </div>
+      </div>
+      <p class="indice" id="noteSurface" style="margin-top:14px"></p>
+    </div>
+
+    <div class="bloc">
+      <h4>Le détail</h4>
+      <dl id="detail"></dl>
       <p class="avert"><b>Cette estimation ne remplace pas une visite.</b> Elle ne
         voit ni l’orientation exacte de votre toit, ni l’ombre du bâtiment voisin,
         ni l’état de votre tableau électrique. Les coûts retenus sont des ordres
@@ -182,7 +239,7 @@ function dessinerResultat() {
     <div class="offre">
       <h3>L’étude détaillée</h3>
       <div class="prix">${formaterRond(OFFRE.prix)}</div>
-      <p style="color:rgba(255,255,255,.72);font-size:15px">Le dossier qu’un
+      <p style="color:rgba(255,255,255,.75);font-size:15.5px">Le dossier qu’un
         installateur accepte comme base de devis — et que vous pouvez opposer à
         trois devis contradictoires.</p>
       <ul>${OFFRE.contenu.map((c) => `<li>
@@ -193,6 +250,33 @@ function dessinerResultat() {
     <p style="text-align:center;margin-top:26px">
       <button class="btn" type="button" id="recommencer">Refaire une estimation</button></p>`;
 
+  // Bornes des curseurs, autour de la recommandation.
+  const cP = $('cPuissance');
+  cP.min = PUISSANCE.min; cP.max = Math.max(PUISSANCE.min + 5, e.puissance * 2.5);
+  cP.step = PUISSANCE.pas; cP.value = e.puissance;
+  $('cSurface').value = simulation.surface;
+
+  cP.addEventListener('input', () => {
+    simulation.puissance = Number(cP.value);
+    rafraichir();
+  });
+  $('cSurface').addEventListener('input', () => {
+    simulation.surface = Number($('cSurface').value);
+    // Une toiture qui rétrécit peut rendre la puissance impossible : on
+    // ramène le curseur à ce que le toit porte, plutôt que de mentir.
+    const max = simulation.surface > 0
+      ? simulation.surface / HYPOTHESES.surfaceParKwc : Infinity;
+    if (simulation.puissance > max) {
+      // Vers le BAS, jamais vers le plus proche : arrondir 3,33 à 3,5
+      // proposerait une installation qui ne tient pas sur le toit.
+      simulation.puissance = Math.max(PUISSANCE.min,
+        Math.floor(max / PUISSANCE.pas) * PUISSANCE.pas);
+      cP.value = simulation.puissance;
+    }
+    rafraichir();
+  });
+
+  rafraichir();
   dessinerDemande(e);
   $('form').hidden = true;
   $('jauge').hidden = true;
@@ -207,6 +291,51 @@ function dessinerResultat() {
     dessinerEtape();
     $('tunnel').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
+}
+
+/** Redessine tout ce qui dépend des curseurs. */
+function rafraichir() {
+  const e = etudeCourante();
+  if (!e) return;
+  const lieu = nomGouvernorat(reponses.gouvernorat);
+  const couverture = Math.round(e.couverture * 100);
+
+  $('titreRes').textContent = `Votre installation : ${
+    String(e.puissance).replace('.', ',')} kWc`;
+  $('sousRes').textContent = `À ${lieu}, ${e.modules} modules sur environ `
+    + `${e.surface} m² couvriraient ${couverture} % de votre consommation.`;
+
+  $('chiffres').innerHTML = [
+    [formaterRond(e.economieMensuelle), 'économie / mois', true],
+    [e.retour ? String(e.retour.toFixed(1)).replace('.', ',') + ' ans' : 'au-delà de 25 ans',
+      'retour sur investissement', false],
+    [formaterRond(e.cout), 'coût estimé', false],
+    [formaterRond(e.gainNet), 'gain net sur 25 ans', false],
+  ].map(([v, l, fort]) => `<div class="chiffre${fort ? ' fort' : ''}">
+    <span class="v">${v}</span><span class="l">${l}</span></div>`).join('');
+
+  $('graphe').innerHTML = construireGraphe(e, { largeur: 620, hauteur: 250 }).svg;
+
+  $('vPuissance').textContent = String(e.puissance).replace('.', ',') + ' kWc';
+  $('vSurface').textContent = simulation.surface > 0
+    ? simulation.surface + ' m²' : 'non précisée';
+  $('noteSurface').textContent = simulation.surface > 0
+    ? `Cette toiture porte au plus ${
+        (simulation.surface / HYPOTHESES.surfaceParKwc).toFixed(1).replace('.', ',')} kWc.`
+    : `Sans contrainte de toiture, comptez ${HYPOTHESES.surfaceParKwc} m² par kWc.`;
+
+  $('detail').innerHTML = [
+    ['Ce que vous payez le kilowattheure', e.prixKwh.toFixed(3).replace('.', ',') + ' DT'],
+    ['Production estimée', e.production.toLocaleString('fr-FR') + ' kWh / an'],
+    [`Zone solaire (${lieu})`, `${zoneSolaire(reponses.gouvernorat)} — ${e.productible} kWh/kWc`],
+    ['Consommé sur place / injecté',
+      `${e.autoconsomme.toLocaleString('fr-FR')} / ${e.surplus.toLocaleString('fr-FR')} kWh`],
+    ['Économie la première année', formater(e.economieAnnuelle)],
+  ].map(([t, d]) => `<dt>${t}</dt><dd>${d}</dd>`).join('');
+
+  // La demande doit transporter l'étude que le visiteur a sous les yeux,
+  // non celle calculée avant qu'il ne touche aux curseurs.
+  dessinerDemande(e);
 }
 
 /** Le formulaire de demande, ou l'aveu que la boutique n'est pas ouverte. */

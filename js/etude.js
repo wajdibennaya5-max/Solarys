@@ -70,8 +70,13 @@ export function puissanceRecommandee({ consommationAnnuelle, gouvernorat, surfac
   }
 
   kwc = Math.min(PUISSANCE.max, Math.max(PUISSANCE.min, kwc));
-  // On arrondit au demi-kilowatt : un onduleur ne se vend pas au centième.
-  return Math.round(kwc / PUISSANCE.pas) * PUISSANCE.pas;
+  // Au demi-kilowatt — un onduleur ne se vend pas au centième — et vers le
+  // BAS quand la toiture contraint : arrondir vers le haut proposerait une
+  // installation qui n'y tient pas.
+  const arrondi = surfaceDisponible > 0
+    ? Math.floor(kwc / PUISSANCE.pas) * PUISSANCE.pas
+    : Math.round(kwc / PUISSANCE.pas) * PUISSANCE.pas;
+  return Math.max(PUISSANCE.min, arrondi);
 }
 
 /**
