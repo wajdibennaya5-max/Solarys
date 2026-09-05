@@ -21,7 +21,12 @@ import { facteurOrientation } from './orientation.js';
 export const HYPOTHESES = {
   /** Coût installé, en dinars par kWc, pose et matériel compris. */
   coutParKwc: 3000,
-  /** Part autoconsommée d'une installation résidentielle sans batterie. */
+  /**
+   * Part autoconsommée d'une installation dimensionnée sur la consommation
+   * annuelle (production ≈ consommation), sans batterie. C'est le point de
+   * référence de la courbe ci-dessous, pas une constante : une installation
+   * plus grosse autoconsomme une part plus faible.
+   */
   autoconsommation: 0.65,
   /** Ce que vaut le surplus injecté, en part du prix d'achat (rachat STEG). */
   valeurSurplus: 0.5,
@@ -37,6 +42,69 @@ export const HYPOTHESES = {
 
 /** Puissance minimale et maximale proposées, en kWc. */
 export const PUISSANCE = { min: 1, max: 30, pas: 0.5 };
+
+/**
+ * LA PART AUTOCONSOMMÉE DÉPEND DE LA TAILLE — et l'ignorer fausse tout.
+ *
+ * Le soleil produit à midi ; le foyer consomme le soir. Une petite
+ * installation passe presque entièrement dans les appareils allumés dans la
+ * journée. Une grosse déborde : le surplus part sur le réseau, où il ne vaut
+ * que le prix de rachat, la moitié du prix d'achat.
+ *
+ * Tant que ce taux était figé, deux installations de tailles très
+ * différentes affichaient le même temps de retour — ce qui est faux, et ce
+ * qui rendait toute comparaison entre scénarios trompeuse.
+ *
+ * La courbe ci-dessous, interpolée linéairement, relie le ratio
+ * production / consommation à la part réellement autoconsommée. Elle passe
+ * par 0,65 à ratio 1 : le dimensionnement de référence ne change pas.
+ * C'est une approximation de foyer tunisien sans batterie, à revoir le jour
+ * où des relevés réels la contrediront.
+ */
+export const COURBE_AUTOCONSOMMATION = [
+  [0.00, 1.00],
+  [0.25, 0.90],
+  [0.50, 0.80],
+  [0.75, 0.72],
+  [1.00, 0.65],
+  [1.25, 0.58],
+  [1.50, 0.52],
+  [2.00, 0.44],
+  [3.00, 0.33],
+];
+
+/** Le point d'ancrage de la courbe : sa valeur à ratio 1. */
+const ANCRAGE = 0.65;
+
+/**
+ * Part de la production consommée sur place, pour un ratio donné.
+ *
+ * @param {number} ratio production annuelle ÷ consommation annuelle
+ * @param {number} reference part autoconsommée à ratio 1 ; toute la courbe
+ *   se règle sur elle, pour qu'ajuster `HYPOTHESES.autoconsommation` ait bien
+ *   l'effet attendu au lieu d'être ignoré en silence.
+ * @returns {number} entre 0 et 1
+ */
+export function tauxAutoconsommation(ratio, reference = HYPOTHESES.autoconsommation) {
+  const points = COURBE_AUTOCONSOMMATION;
+  const echelle = (reference > 0 ? reference : ANCRAGE) / ANCRAGE;
+  const lu = (v) => Math.max(0, Math.min(1, v * echelle));
+
+  const r = Number(ratio);
+  if (!(r > 0)) return lu(points[0][1]);
+  if (r >= points.at(-1)[0]) {
+    // Au-delà du dernier point, on prolonge la décroissance sans jamais
+    // franchir zéro : une installation démesurée autoconsomme peu, pas rien.
+    const [dr, dt] = points.at(-1);
+    return Math.max(0.05, lu((dt * dr) / r));
+  }
+  for (let i = 1; i < points.length; i++) {
+    const [x1, y1] = points[i - 1];
+    const [x2, y2] = points[i];
+    if (r <= x2) return lu(y1 + ((y2 - y1) * (r - x1)) / (x2 - x1));
+  }
+  return lu(points.at(-1)[1]);
+}
 
 /**
  * Prix réel du kilowattheure, déduit de la facture.
@@ -112,8 +180,11 @@ export function etudier({
   const consommation = Number(consommationAnnuelle);
 
   // Ce qui est consommé directement vaut le prix d'achat ; le reste est
-  // injecté et ne vaut que le prix de rachat.
-  const autoconsomme = Math.min(consommation, production * hypotheses.autoconsommation);
+  // injecté et ne vaut que le prix de rachat. La part autoconsommée dépend
+  // de la taille de l'installation, pas d'une constante : voir la courbe.
+  const ratio = production / consommation;
+  const taux = tauxAutoconsommation(ratio, hypotheses.autoconsommation);
+  const autoconsomme = Math.min(consommation, production * taux);
   const surplus = Math.max(0, production - autoconsomme);
   const economieAn1 = autoconsomme * prixKwh
     + surplus * prixKwh * hypotheses.valeurSurplus;
@@ -147,7 +218,11 @@ export function etudier({
     mensuel: productionMensuelle(Math.round(production), gouvernorat),
     prixKwh,
     consommation,
-    couverture: Math.min(1, production / consommation),
+    couverture: Math.min(1, ratio),
+    /** Le même rapport, sans plafond : « 130 % de vos besoins » se dit. */
+    ratio,
+    /** Part de la production réellement consommée sur place. */
+    tauxAutoconsommation: taux,
     autoconsomme: Math.round(autoconsomme),
     surplus: Math.round(surplus),
     economieAnnuelle: economieAn1,

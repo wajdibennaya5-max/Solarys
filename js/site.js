@@ -17,6 +17,7 @@ import { construireGraphe, grapheMensuel } from './graphe.js';
 import { OFFRE, CONTACT, ouverte, redigerDemande, lienDemande, champsManquants,
   envoyerAuServeur, API } from './prospect.js';
 import { enregistrer, relire, effacer, ageEnClair } from './session.js';
+import { comparer, scenarioParDefaut, ecart } from './scenarios.js';
 
 const $ = (id) => document.getElementById(id);
 const reponses = {};
@@ -352,20 +353,83 @@ function chiffre(valeur, libelle, fort = false) {
 /** L'état de la simulation : ce que le visiteur a déplacé lui-même. */
 let simulation = { puissance: null, surface: 0 };
 
-/** Recalcule l'étude avec les réglages courants. */
-function etudeCourante() {
+/**
+ * Les données du foyer, telles que le calcul les attend.
+ *
+ * Un seul endroit où elles se composent : l'étude affichée et les trois
+ * scénarios comparés doivent reposer exactement sur les mêmes chiffres, sans
+ * quoi la comparaison ne voudrait rien dire.
+ */
+function donneesEtude() {
   const toit = reponses.toit ?? {};
   const annuel = versAnnuel(reponses.facture ?? {});
   if (!annuel) return null;
-  return etudier({
+  return {
     consommationAnnuelle: annuel.consommationAnnuelle,
     montantAnnuel: annuel.montantAnnuel,
     gouvernorat: reponses.gouvernorat,
     surfaceDisponible: simulation.surface,
-    puissance: simulation.puissance,
     orientation: toit.orientation ?? null,
     pente: toit.pente ?? null,
-  });
+  };
+}
+
+/** Recalcule l'étude avec les réglages courants. */
+function etudeCourante() {
+  const d = donneesEtude();
+  if (!d) return null;
+  return etudier({ ...d, puissance: simulation.puissance });
+}
+
+/**
+ * Les trois scénarios, et celui qui est retenu à l'écran.
+ *
+ * POURQUOI TROIS : une seule puissance proposée est un chiffre à croire ;
+ * trois est un choix à faire. Le client voit ce que coûte le kilowatt de plus
+ * et ce qu'il rapporte — et il achète en connaissance de cause.
+ */
+function dessinerScenarios() {
+  const hote = $('scenarios');
+  const bloc = $('blocScenarios');
+  if (!hote || !bloc) return;
+  const d = donneesEtude();
+  const trio = d ? comparer(d) : [];
+
+  // Un seul scénario possible — toit trop petit — n'est pas un choix : le
+  // bloc disparaît plutôt que d'afficher une comparaison à un terme.
+  bloc.hidden = trio.length < 2;
+  if (bloc.hidden) { hote.innerHTML = ''; return; }
+
+  hote.innerHTML = trio.map((s, i) => {
+    const choisi = s.puissance === simulation.puissance;
+    const e = s.etude;
+    const dessus = i > 0 ? ecart(trio[i - 1], s) : null;
+    return `<button type="button" class="scenario${choisi ? ' choisi' : ''}"
+      data-kwc="${s.puissance}" aria-pressed="${choisi}">
+      <span class="sc-nom">${s.nom}</span>
+      <span class="sc-kwc">${String(s.puissance).replace('.', ',')} kWc</span>
+      <span class="sc-promesse">${s.promesse}</span>
+      <dl class="sc-faits">
+        <div><dt>Coût</dt><dd>${formaterRond(e.cout)}</dd></div>
+        <div><dt>Économie / mois</dt><dd>${formaterRond(e.economieMensuelle)}</dd></div>
+        <div><dt>Retour</dt><dd>${e.retour
+          ? String(e.retour.toFixed(1)).replace('.', ',') + ' ans' : '> 25 ans'}</dd></div>
+        <div><dt>Gain sur 25 ans</dt><dd>${formaterRond(e.gainNet)}</dd></div>
+        <div><dt>Couvre vos besoins à</dt><dd>${Math.round(e.ratio * 100)} %</dd></div>
+        <div><dt>Consommé sur place</dt><dd>${
+          Math.round(e.tauxAutoconsommation * 100)} %</dd></div>
+      </dl>
+      <span class="sc-detail">${s.detail}</span>
+      ${dessus ? `<span class="sc-ecart">${dessus}</span>` : ''}
+    </button>`;
+  }).join('');
+
+  const retenu = trio.find((s) => s.puissance === simulation.puissance);
+  $('noteScenarios').textContent = retenu
+    ? `Vous regardez le scénario ${retenu.nom}.`
+    : `Vous avez réglé une puissance sur mesure : ${
+        String(simulation.puissance).replace('.', ',')} kWc. `
+      + `Le scénario ${scenarioParDefaut(trio).nom} reste notre conseil.`;
 }
 
 function dessinerResultat() {
@@ -385,6 +449,16 @@ function dessinerResultat() {
     <p class="sous-titre" style="margin-bottom:0" id="sousRes"></p>
 
     <div class="chiffres" id="chiffres"></div>
+
+    <div class="bloc" id="blocScenarios">
+      <h4>Trois façons de dimensionner votre toiture</h4>
+      <p class="note">Le même toit, le même soleil, la même facture : seule la
+        taille change. Le plus petit se rembourse le plus vite, le plus grand
+        rapporte le plus sur vingt-cinq ans. Touchez celui qui vous ressemble —
+        tout le reste de la page suit.</p>
+      <div class="scenarios" id="scenarios"></div>
+      <p class="indice" id="noteScenarios" role="status" style="margin-top:14px"></p>
+    </div>
 
     <div class="bloc">
       <h4>Quand l’installation se rembourse</h4>
@@ -457,6 +531,19 @@ function dessinerResultat() {
     simulation.puissance = Number(cP.value);
     rafraichir();
   });
+
+  // Une seule écoute sur le conteneur : les cartes sont redessinées à chaque
+  // rafraîchissement, des écoutes posées sur chacune fuiraient à chaque fois.
+  $('scenarios').addEventListener('click', (ev) => {
+    const carte = ev.target.closest('[data-kwc]');
+    if (!carte) return;
+    simulation.puissance = Number(carte.dataset.kwc);
+    // Le curseur peut ne pas atteindre le scénario Performance sur une petite
+    // installation : on élargit plutôt que d'ignorer le clic.
+    if (simulation.puissance > Number(cP.max)) cP.max = simulation.puissance;
+    cP.value = simulation.puissance;
+    rafraichir();
+  });
   $('cSurface').addEventListener('input', () => {
     simulation.surface = Number($('cSurface').value);
     // Une toiture qui rétrécit peut rendre la puissance impossible : on
@@ -512,6 +599,8 @@ function rafraichir() {
     <span class="v">${v}</span><span class="l">${l}</span></div>`).join('');
 
   $('graphe').innerHTML = construireGraphe(e, { largeur: 620, hauteur: 250 }).svg;
+
+  dessinerScenarios();
 
   $('vPuissance').textContent = String(e.puissance).replace('.', ',') + ' kWc';
   $('vSurface').textContent = simulation.surface > 0
