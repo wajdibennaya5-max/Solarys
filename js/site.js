@@ -17,6 +17,7 @@ import { definirFond, fondActif, capacites as capacitesCarte,
 import { creerCarte } from './vues/carte.js';
 import { creerScene3d } from './vues/scene.js';
 import { construireScene } from './scene3d.js';
+import { implanter, eleverModules } from './implantation.js';
 import { projeter as projeterSommets } from './toiture.js';
 import { planCalepinage } from './calepinage.js';
 import { ORIENTATIONS, PENTES, expliquerOrientation } from './orientation.js';
@@ -471,6 +472,26 @@ const ETAPES = [
             min="0" max="40" step="0.1" value="3">
         </div>
         <div id="scene3d" class="scene-boite"></div>
+
+        <div class="duo">
+          <div class="champ">
+            <label for="modulePose">Pose des modules</label>
+            <select id="modulePose" name="modulePose">
+              ${POSES.map((p) => `<option value="${p.id}">${p.nom} — ${p.resume}</option>`)
+    .join('')}
+            </select>
+          </div>
+          <div class="champ">
+            <label for="riveToit">Retrait de rive (m)</label>
+            <input id="riveToit" type="number" inputmode="decimal" min="0" max="3"
+              step="0.05" value="0.35">
+          </div>
+        </div>
+        <div class="outils">
+          <button type="button" class="btn fantome" id="poserModules">Poser les modules</button>
+          <button type="button" class="btn fantome" id="retirerModules">Retirer</button>
+        </div>
+        <div id="compteursModules"></div>
         <div id="arbreScene"></div>
       </details>
 
@@ -1252,7 +1273,13 @@ function appliquerTrace() {
     P: Number(P.toFixed(1)), pente: $('pente')?.value ?? 'moyenne',
     orientation: $('orientation')?.value ?? 'sud',
     trace: { sommets: sommetsToit, facteur: facteurEchelle,
-      etalonne: echelleEtalonnee, surface: m.surfaceRampant } };
+      etalonne: echelleEtalonnee, surface: m.surfaceRampant,
+      // Ce que le toit peut porter, retenu tel quel — sans jamais l'imposer
+      // au dimensionnement, qui part de la consommation.
+      capacite: planImplantation?.nombre
+        ? { modules: planImplantation.nombre, kwc: planImplantation.puissance,
+          pose: planImplantation.orientation, rive: planImplantation.rive }
+        : null } };
   majOrientation();
   memoriser();
 
@@ -1296,28 +1323,97 @@ function hauteurMurSaisie() {
   return Number.isFinite(v) && v >= 0 && v <= 40 ? v : 3;
 }
 
+/** Les modules sont-ils posés ? Un état, pas une supposition. */
+let modulesPoses = false;
+/** Le dernier plan d'implantation calculé, pour les compteurs et le report. */
+let planImplantation = null;
+
+/** Le contour du toit en mètres, échelle d'étalonnage comprise. */
+function contourMetrique() {
+  if (sommetsToit.length < 3) return null;
+  const m = mesuresToit();
+  if (!m.exploitable) return null;
+  const { points } = projeterSommets(sommetsToit);
+  // L'étalonnage porte sur les longueurs : le volume doit en tenir compte,
+  // sinon il ne serait pas celui qu'on a mesuré juste au-dessus.
+  const k = m.facteur;
+  return { points: points.map((p) => ({ x: p.x * k, y: p.y * k })), mesures: m };
+}
+
 /**
  * La scène, construite depuis le contour tracé.
  *
- * Le contour est géographique ; la scène est métrique. `projeter` fait la
- * bascule, et c'est le même code qui sert aux mesures : deux projections
- * différentes donneraient un volume qui ne correspondrait pas aux mètres
- * carrés affichés juste au-dessus.
+ * Le contour est géographique ; la scène est métrique. C'est la MÊME
+ * projection que celle des mesures : deux projections différentes donneraient
+ * un volume qui ne correspondrait pas aux mètres carrés affichés au-dessus.
  */
 function sceneCourante() {
-  if (sommetsToit.length < 3) return null;
-  const { points } = projeterSommets(sommetsToit);
-  const m = mesuresToit();
-  if (!m.exploitable) return null;
-  // L'étalonnage porte sur les longueurs : la scène doit en tenir compte,
-  // sinon le volume affiché ne serait pas celui qu'on a mesuré.
-  const k = m.facteur;
-  const azPan = azimutProbableDuPan(m);
-  return construireScene(points.map((p) => ({ x: p.x * k, y: p.y * k })), {
+  const c = contourMetrique();
+  if (!c) return null;
+  const azPan = azimutProbableDuPan(c.mesures) ?? 0;
+  const scene = construireScene(c.points, {
     pente: penteDegres(),
-    azimut: azPan ?? 0,
+    azimut: azPan,
     hauteurMur: hauteurMurSaisie(),
   });
+
+  planImplantation = modulesPoses
+    ? implanter(c.points, {
+      module: reglagePose().module,
+      pose: $('modulePose')?.value ?? 'auto',
+      pente: penteDegres(),
+      azimut: azPan,
+      rive: riveSaisie(),
+    })
+    : null;
+
+  if (planImplantation?.modules?.length) {
+    // Les modules entrent dans la scène comme des faces à part entière : ils
+    // se trient avec le reste, s'éclairent comme le reste, et s'éteignent
+    // avec leur propre bouton.
+    scene.faces.push(...eleverModules(planImplantation, scene.toit));
+  }
+  return scene;
+}
+
+/** Le retrait de rive saisi, borné à ce qu'un couvreur accepterait. */
+function riveSaisie() {
+  const v = Number($('riveToit')?.value);
+  return Number.isFinite(v) && v >= 0 && v <= 3 ? v : RIVE_DEFAUT;
+}
+const RIVE_DEFAUT = 0.35;
+
+/** Les compteurs d'implantation — présentation, aucun calcul. */
+function compteursImplantation(plan) {
+  if (!plan) {
+    return `<p class="indice">Les modules ne sont pas posés. Le bouton ci-dessus
+      remplit le pan tracé, retrait de rive compris.</p>`;
+  }
+  if (!plan.nombre) {
+    return `<p class="alerte-trace">${echapper(plan.raison)}</p>`;
+  }
+  const compteur = (v, l) => `<div class="compteur"><b>${v}</b><span>${l}</span></div>`;
+  return `<div class="compteurs">
+    ${compteur(plan.nombre, 'modules')}
+    ${compteur(`${plan.puissance.toFixed(2)} kWc`, 'puissance continue')}
+    ${compteur(`${plan.surfaceUtilisee.toFixed(1)} m²`, 'surface occupée')}
+    ${compteur(`${plan.surfaceRestante.toFixed(1)} m²`, 'rampant restant')}
+    ${compteur(`${Math.round(plan.tauxOccupation * 100)} %`, 'taux d’occupation')}
+    ${compteur(plan.orientation === 'paysage' ? 'Paysage' : 'Portrait',
+    `${plan.colonnes} × ${plan.rangees}`)}
+  </div>
+  ${plan.alternative !== null && plan.alternative !== plan.nombre
+    ? `<p class="indice">Pose imposée en ${plan.orientation}. En
+        ${plan.orientation === 'portrait' ? 'paysage' : 'portrait'}, le pan porterait
+        ${plan.alternative} module${plan.alternative > 1 ? 's' : ''}
+        (${plan.alternative > plan.nombre ? '+' : ''}${plan.alternative - plan.nombre}).</p>`
+    : ''}
+  <p class="pos-phrase reserve">Implantation calculée sur le contour tracé, avec
+    ${plan.rive} m de rive et ${plan.jeu} m entre modules. Elle ne tient compte
+    d’aucun obstacle de toiture : ceux-ci ne sont pas encore relevés.</p>
+  <p class="indice">Ces ${plan.puissance.toFixed(2)} kWc sont ce que le toit peut
+    PORTER. L’étude, elle, dimensionne d’après votre consommation : les deux
+    chiffres n’ont pas à coïncider, et le plus petit des deux commande.</p>`;
 }
 
 /** L'arborescence de la scène : ce qui est représenté, et d'où ça vient. */
@@ -1333,7 +1429,10 @@ function arbreScene(scene, m) {
     ${branche('Toiture', `1 pan, ${Math.round(scene.toit.pente)}° de pente, `
       + `${m.surfaceRampant.toFixed(1)} m² de rampant`, 'contour tracé sur la carte')}
     ${branche('Obstacles', 'aucun', 'pas encore relevés')}
-    ${branche('Générateur', 'aucun module posé', 'à venir')}
+    ${branche('Générateur', planImplantation?.nombre
+    ? `${planImplantation.nombre} modules, ${planImplantation.puissance.toFixed(2)} kWc`
+    : 'aucun module posé', planImplantation?.nombre
+    ? 'implantation sur le contour tracé' : 'à poser')}
   </ul>
   <p class="indice">Faîtage à ${scene.toit.hauteurMax.toFixed(2)} m, égout à
     ${scene.toit.hauteurMin.toFixed(2)} m — déduits du contour et de la pente,
@@ -1352,6 +1451,15 @@ function majVue3d() {
   }
   const arbre = $('arbreScene');
   if (arbre) arbre.innerHTML = scene ? arbreScene(scene, mesuresToit()) : '';
+  const compteurs = $('compteursModules');
+  if (compteurs) compteurs.innerHTML = scene ? compteursImplantation(planImplantation) : '';
+  const poser = $('poserModules');
+  if (poser) {
+    poser.disabled = !scene;
+    poser.textContent = modulesPoses ? 'Recalculer l’implantation' : 'Poser les modules';
+  }
+  const retirer = $('retirerModules');
+  if (retirer) retirer.disabled = !modulesPoses;
 }
 
 /** Branche la vue en volume. */
@@ -1363,6 +1471,19 @@ function brancherVue3d() {
   vue3d = creerScene3d(boite, { scene: sceneCourante() });
   $('hauteurMur')?.addEventListener('input', majVue3d);
   $('hauteurMur')?.addEventListener('change', majVue3d);
+  $('modulePose')?.addEventListener('change', majVue3d);
+  // « change » seul ne suffit pas sur un champ numérique : les flèches et la
+  // saisie au clavier n'émettent que « input » tant qu'on n'a pas quitté le
+  // champ, et le retrait de rive paraissait alors sans effet.
+  for (const evenement of ['input', 'change']) {
+    $('riveToit')?.addEventListener(evenement, majVue3d);
+  }
+  $('poserModules')?.addEventListener('click', () => { modulesPoses = true; majVue3d(); });
+  $('retirerModules')?.addEventListener('click', () => {
+    modulesPoses = false;
+    planImplantation = null;
+    majVue3d();
+  });
   majVue3d();
 }
 

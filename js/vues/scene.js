@@ -26,6 +26,9 @@ const TEINTES = {
   terrain: [193, 200, 190],
   mur: [236, 228, 214],
   toit: [232, 163, 61],
+  // Un bleu très sombre : c'est la couleur d'un module réel, et surtout elle
+  // ne se confond avec aucune autre face de la scène.
+  module: [30, 42, 66],
 };
 
 const el = (nom, classe, dedans) => {
@@ -61,7 +64,7 @@ export function creerScene3d(racine, { scene = null, surVue = null } = {}) {
   let hauteur = 0;
 
   /** Ce que l'on montre. Chaque couche s'éteint séparément. */
-  const couches = { terrain: true, mur: true, toit: true, cotes: true };
+  const couches = { terrain: true, mur: true, toit: true, module: true, cotes: true };
 
   racine.classList.add('scene3d');
   racine.setAttribute('role', 'application');
@@ -92,7 +95,8 @@ export function creerScene3d(racine, { scene = null, surVue = null } = {}) {
   }
 
   const bascules = el('div', 'scene3d-couches');
-  const NOMS = { terrain: 'Terrain', mur: 'Murs', toit: 'Toiture', cotes: 'Cotes' };
+  const NOMS = { terrain: 'Terrain', mur: 'Murs', toit: 'Toiture',
+    module: 'Modules', cotes: 'Cotes' };
   const boutonsCouche = {};
   for (const [cle, nom] of Object.entries(NOMS)) {
     const b = el('button', 'scene3d-couche actif', nom);
@@ -152,7 +156,10 @@ export function creerScene3d(racine, { scene = null, surVue = null } = {}) {
       contexte.fill();
       // Les arêtes : sans elles, deux faces de teinte voisine se confondent et
       // le volume disparaît.
-      contexte.strokeStyle = 'rgba(28,32,38,.45)';
+      // Les modules se dessinent au trait clair : sur un fond presque noir,
+      // une arête sombre disparaît et le champ devient une tache.
+      contexte.strokeStyle = f.role === 'module'
+        ? 'rgba(255,255,255,.45)' : 'rgba(28,32,38,.45)';
       contexte.lineWidth = f.role === 'toit' ? 1.6 : 1;
       contexte.stroke();
     }
