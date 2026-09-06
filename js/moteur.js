@@ -32,6 +32,8 @@ import { productible, nomGouvernorat, zoneSolaire } from './gisement.js';
 import { facteurOrientation } from './orientation.js';
 import { moduleParId, CATALOGUE_REEL } from './materiel.js';
 import { analyser } from './diagnostics.js';
+import { production as productionService } from './pvgis/client.js';
+import { puissanceRecommandee } from './etude.js';
 
 /**
  * Version du moteur de calcul.
@@ -454,6 +456,71 @@ export function simuler(entrees, { puissance = null, hypotheses = HYPOTHESES } =
     avertissements: analyser(entrees, contexte),
     verdictElectrique: dimensionnement ? verdictGlobal(dimensionnement.controles) : 'inconnu',
     lieu: nomGouvernorat(entrees.gouvernorat),
+  };
+}
+
+/**
+ * ENRICHIR UNE SIMULATION AVEC LE SERVICE DE DONNÉES SOLAIRES.
+ *
+ * Cette fonction est la SEULE porte entre le moteur et le monde extérieur, et
+ * elle est asynchrone parce que le monde extérieur l'est. Elle ne remplace
+ * jamais un résultat en silence : elle rend une mesure étiquetée que la
+ * fusion saura préférer au référentiel interne, ou un échec que la page
+ * saura afficher.
+ *
+ * TROIS GARANTIES :
+ *
+ * 1. Sans coordonnées exploitables, elle n'appelle rien : le service
+ *    travaille au point, et le centre d'un gouvernorat n'est pas un point.
+ *    On appelle quand même dans ce cas, mais le résultat porte la précision
+ *    de la position, et la fiche du site la montre.
+ * 2. Sans relais configuré, elle rend un échec « indisponible » immédiat,
+ *    sans réseau, sans attente.
+ * 3. Elle ne lève jamais et ne modifie pas la simulation reçue.
+ *
+ * @returns {{ok:true, mesure, productibleAvant, productibleApres}|{ok:false, …}}
+ */
+export async function enrichirDepuisService(entrees, { puissance = null,
+  chercher = undefined } = {}) {
+  if (!entrees || !Number.isFinite(Number(entrees.latitude))
+    || !Number.isFinite(Number(entrees.longitude))) {
+    return { ok: false, genre: 'parametres', recuperable: false,
+      messageClient: 'La position du bâtiment n’est pas connue : le service de '
+        + 'données solaires travaille au point, pas à la région. Utilisez la '
+        + 'localisation automatique ou indiquez les coordonnées.' };
+  }
+
+  const kwc = Number(puissance) > 0 ? Number(puissance)
+    : puissanceRecommandee({
+      consommationAnnuelle: entrees.consommationAnnuelle,
+      gouvernorat: entrees.gouvernorat,
+      surfaceDisponible: entrees.surfaceDisponible,
+      orientation: entrees.orientation,
+      pente: entrees.pente,
+    });
+  if (!(kwc > 0)) {
+    return { ok: false, genre: 'parametres', recuperable: false,
+      messageClient: 'La puissance à étudier n’est pas encore connue.' };
+  }
+
+  const mesure = await productionService({
+    latitude: Number(entrees.latitude),
+    longitude: Number(entrees.longitude),
+    puissanceKwc: kwc,
+    orientation: entrees.orientation,
+    pente: entrees.pente,
+    moduleId: entrees.moduleId ?? null,
+  }, chercher ? { chercher } : {});
+
+  if (!mesure.ok) return mesure;
+
+  return {
+    ok: true,
+    mesure,
+    depuisCache: mesure.depuisCache === true,
+    productibleAvant: productible(entrees.gouvernorat),
+    productibleApres: mesure.productible?.valeur ?? null,
+    puissanceInterrogee: kwc,
   };
 }
 

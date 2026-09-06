@@ -21,6 +21,12 @@
   font-src https://fonts.gstatic.com; img-src 'self' data:;
   connect-src 'self' https://20122011.xyz; form-action 'self'; base-uri 'none';
   object-src 'none'; manifest-src 'self'">
+<!-- SERVICE DE DONNÉES SOLAIRES — décommentez cette ligne une fois le relais
+     déployé sur votre serveur (route `/api/pvgis` du dépôt cer-expert).
+     L'adresse doit aussi figurer dans `connect-src` ci-dessus, sinon le
+     navigateur bloque l'appel sans rien dire.
+<meta name="pvgis-relais" content="https://20122011.xyz/api/pvgis">
+-->
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -793,6 +799,35 @@ details[open]>summary .hy-titre::before{content:'– '}
   color:var(--encre);font-family:inherit}
 .copi-champ input:focus{outline:none;border-color:var(--argile)}
 .copi-champ .btn{flex:0 0 auto}
+
+/* ── Centre de données solaires ──────────────────────────────────── */
+.cds{margin:16px 0;border:1.5px solid var(--bord);border-left-width:4px;border-radius:14px;
+  padding:15px 17px;background:var(--surface)}
+.cds-repli{border-left-color:var(--repere)}
+.cds-encours{border-left-color:var(--or)}
+.cds-echec{border-left-color:var(--argile);background:#fdf6f4}
+.cds-ok{border-left-color:#4d9166}
+.cds-titre{font-family:var(--titre);font-size:15px;font-weight:800;color:var(--nuit)}
+.cds-txt{font-size:13px;color:var(--encre-2);line-height:1.6;margin-top:7px}
+.bloc .cds-faits,.cds-faits{display:block;margin-top:11px;font-size:13px}
+.cds-faits>div{display:flex;justify-content:space-between;gap:10px;
+  border-top:1px solid var(--bord);padding:7px 0}
+.cds-faits dt{color:var(--encre-2)}
+.cds-faits dd{margin:0;font-weight:800;color:var(--nuit);text-align:right;
+  font-variant-numeric:tabular-nums}
+.cds-detail{margin-top:10px}
+.cds-detail summary{cursor:pointer;font-size:12.5px;font-weight:700;color:var(--encre-2);
+  list-style:none}
+.cds-detail summary::-webkit-details-marker{display:none}
+.cds-detail summary::before{content:'+ ';color:var(--argile);font-weight:800}
+.cds-detail[open] summary::before{content:'– '}
+.cds-detail ul{list-style:disc;margin:8px 0 0 18px;font-size:12.5px;color:var(--encre-2);
+  line-height:1.65}
+.cds-note{font-size:12px;color:var(--encre-3);margin-top:8px;line-height:1.5}
+.cds-note code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;
+  background:var(--douce);padding:1px 5px;border-radius:4px}
+.cds-attrib{font-size:11.5px;color:var(--encre-3);margin-top:9px}
+.cds .btn{margin-top:11px;font-size:13px;padding:9px 16px}
 
 /* ── Provenance : fiche du site, origines, détail d'un chiffre ───── */
 .orig{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.07em;

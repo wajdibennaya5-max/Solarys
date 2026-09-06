@@ -86,9 +86,28 @@ export function donneesEtude() {
     batiment: reponses.batiment ?? TYPE_DEFAUT,
     moduleWc: reglagePose().module.puissance,
     moduleId: reglagePose().module.id,
+    productibleMesure,
     ...position(),
   };
 }
+
+/**
+ * Le productible mesuré au point par le service de données solaires, quand il
+ * en existe un.
+ *
+ * Le contrôleur le pose ici après avoir interrogé le service ; tout le reste
+ * du calcul le reprend sans savoir d'où il vient. C'est ce qui permet
+ * d'intégrer une source externe sans la répandre dans tout le code.
+ */
+let productibleMesure = null;
+
+export function definirProductibleMesure(v) {
+  const n = Number(v);
+  productibleMesure = Number.isFinite(n) && n > 0 ? n : null;
+  return productibleMesure;
+}
+
+export const productibleMesureCourant = () => productibleMesure;
 
 /**
  * Le point exact, quand il est connu.

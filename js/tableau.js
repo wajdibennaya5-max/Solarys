@@ -726,3 +726,70 @@ export function panneauProvenance(fusion, noms = {}) {
     </div>
   </details>`;
 }
+
+/**
+ * LE CENTRE DE DONNÉES SOLAIRES — l'état du service, et ce qu'il apporte.
+ *
+ * Il n'apparaît qu'une fois l'étude faite, et il ne promet rien qu'il ne
+ * puisse tenir : quand le relais n'est pas configuré, il le dit et explique
+ * ce que la plateforme utilise à la place. Un panneau qui afficherait un
+ * bouton inerte serait pire que pas de panneau du tout.
+ */
+export function centreDonnees({ configure, etat, mesure, avertissement, attribution }) {
+  if (!configure) {
+    return `<div class="cds cds-repli">
+      <p class="cds-titre">Référentiel interne</p>
+      <p class="cds-txt">${avertissement ?? ''} Le rayonnement retenu vient de notre
+        référentiel par gouvernorat, et chaque valeur de l’étude porte son
+        origine.</p>
+      <details class="cds-detail"><summary>Ce que le service apporterait</summary>
+        <ul>
+          <li>Un rayonnement calculé <b>au point</b> plutôt que par région.</li>
+          <li>L’<b>altitude</b> du site et la base de données utilisée.</li>
+          <li>La <b>période</b> couverte par les mesures.</li>
+          <li>Le <b>relief environnant</b>, distinct des obstacles de toiture.</li>
+        </ul>
+        <p class="cds-note">Activation : déployer le relais sur votre serveur, puis
+          ajouter une balise <code>meta name="pvgis-relais"</code> dans la page.</p>
+      </details>
+    </div>`;
+  }
+
+  if (etat === 'encours') {
+    return `<div class="cds cds-encours">
+      <p class="cds-titre">Interrogation du service de données solaires…</p>
+      <div class="squelette" aria-hidden="true"><span style="width:78%"></span>
+        <span style="width:56%"></span></div>
+    </div>`;
+  }
+
+  if (etat === 'echec') {
+    return `<div class="cds cds-echec">
+      <p class="cds-titre">Service momentanément indisponible</p>
+      <p class="cds-txt">${avertissement ?? ''}</p>
+      <p class="cds-txt">Votre étude reste complète : elle utilise notre référentiel
+        interne, et la fiche du site l’indique.</p>
+      <button class="btn" type="button" id="reessayerService">Réessayer</button>
+    </div>`;
+  }
+
+  const productible = mesure?.productible;
+  const irradiation = mesure?.irradiation;
+  return `<div class="cds cds-ok">
+    <p class="cds-titre">Données solaires du site obtenues</p>
+    <dl class="cds-faits">
+      ${productible ? `<div><dt>Productible au point</dt>
+        <dd>${productible.valeur} kWh/kWc/an ${etiquetteSource(productible)}</dd></div>` : ''}
+      ${irradiation && irradiation.valeur !== null ? `<div><dt>Irradiation reçue</dt>
+        <dd>${irradiation.valeur} kWh/m²/an ${etiquetteSource(irradiation)}</dd></div>` : ''}
+      ${mesure?.origine?.baseDonnees ? `<div><dt>Base de données</dt>
+        <dd>${mesure.origine.baseDonnees}</dd></div>` : ''}
+      ${mesure?.origine?.anneeDebut ? `<div><dt>Période couverte</dt>
+        <dd>${mesure.origine.anneeDebut} – ${mesure.origine.anneeFin}</dd></div>` : ''}
+    </dl>
+    <p class="cds-txt">Les chiffres de l’étude ont été recalculés sur ces données.
+      Ce qui vient du service porte l’étiquette <span class="orig orig-externe">SOURCE</span>,
+      ce que nous en déduisons porte <span class="orig orig-calcul">CALCUL</span>.</p>
+    ${attribution ? `<p class="cds-attrib">${attribution.mention}</p>` : ''}
+  </div>`;
+}

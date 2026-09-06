@@ -47,7 +47,11 @@ export function profilSite(entrees = {}, mesureService = null) {
     })
     : absente(`${nom} inconnue`));
 
+  // Le productible affiché est celui qui a SERVI au calcul : `etudier()` a
+  // reçu la mesure, ou ne l'a pas reçue. Afficher l'un et calculer sur
+  // l'autre serait un décor.
   const productible = parService && disponible(mesureService.productible)
+    && Number(entrees.productibleMesure) > 0
     ? mesureService.productible
     : tracer(productibleInterne(entrees.gouvernorat), {
       source: 'interne',

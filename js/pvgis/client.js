@@ -40,7 +40,7 @@ const patienter = (ms) => new Promise((r) => { setTimeout(r, ms); });
  * téléphone pour un résultat que plus personne n'attend.
  */
 async function appeler(chemin, params, delai, chercher) {
-  const url = `${RELAIS}?calcul=${encodeURIComponent(chemin)}&`
+  const url = `${RELAIS()}?calcul=${encodeURIComponent(chemin)}&`
     + new URLSearchParams(params).toString();
   const controleur = new AbortController();
   const minuterie = setTimeout(() => controleur.abort(), delai);

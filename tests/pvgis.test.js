@@ -9,6 +9,10 @@ import { interroger, production, statistiques } from '../js/pvgis/client.js';
 import { nu, disponible, estTracee, confianceGlobale, tracer, absente, SOURCES,
   composition, expliquer } from '../js/provenance.js';
 import { ORIENTATIONS, PENTES, facteurOrientation } from '../js/orientation.js';
+import { etudier, productibleRetenu } from '../js/etude.js';
+import { productible as productibleInterne } from '../js/gisement.js';
+import { simuler } from '../js/moteur.js';
+import { fusionner } from '../js/fusion.js';
 
 /* ------------------------------------------------------------------ */
 /* Provenance                                                          */
@@ -358,7 +362,7 @@ test('les compteurs de diagnostic existent et restent lisibles', () => {
 test('la configuration ne laisse traîner ni URL ni version ailleurs', () => {
   assert.match(config.VERSION_API, /^v\d+_\d+$/);
   assert.ok(config.BASE.includes(config.VERSION_API));
-  assert.equal(config.disponible(), typeof config.RELAIS === 'string' && config.RELAIS.length > 0);
+  assert.equal(config.disponible(), typeof config.RELAIS() === 'string');
   // Chaque calcul déclaré porte un chemin et un poids.
   for (const [id, c] of Object.entries(config.CALCULS)) {
     assert.equal(c.id, id);
@@ -387,4 +391,129 @@ test('l’heure d’un profil se lit en nombre COMME en texte', () => {
   assert.equal(j.heures.length, 2);
   assert.equal(j.heures[1].heure, 12);
   assert.equal(j.heures[1].production, 2800);
+});
+
+test('le relais se règle en HTTPS seulement', () => {
+  // Un relais en clair exposerait les coordonnées du visiteur sur le réseau.
+  assert.equal(config.definirRelais('http://exemple.tn/api/pvgis'), null);
+  assert.equal(config.definirRelais('pas-une-adresse'), null);
+  assert.equal(config.definirRelais(42), null);
+  assert.equal(config.disponible(), false);
+  assert.equal(config.definirRelais('https://exemple.tn/api/pvgis'),
+    'https://exemple.tn/api/pvgis');
+  assert.equal(config.disponible(), true);
+  config.definirRelais(null);
+  assert.equal(config.disponible(), false);
+});
+
+test('avec un relais et une réponse valide, la chaîne complète fonctionne', async () => {
+  // Le relais n'est pas encore déployé : ce test prouve que le jour où il le
+  // sera, tout le chemin — composition, appel, normalisation, cache — tient.
+  config.definirRelais('https://exemple.tn/api/pvgis');
+  cache.vider();
+  let urlAppelee = null;
+  const faux = async (url) => {
+    urlAppelee = url;
+    return { ok: true, status: 200, json: async () => REPONSE };
+  };
+  const r = await production({ latitude: 34.74, longitude: 10.76, puissanceKwc: 4,
+    orientation: 'sud', pente: 'moyenne' }, { chercher: faux });
+  assert.equal(r.ok, true);
+  assert.equal(nu(r.production), 6820);
+  assert.equal(r.depuisCache, false);
+  assert.match(urlAppelee, /calcul=PVcalc/);
+  assert.match(urlAppelee, /aspect=0/);
+  assert.match(urlAppelee, /peakpower=4/);
+
+  // Deuxième appel identique : servi par le cache, sans toucher au réseau.
+  let rappele = false;
+  const r2 = await production({ latitude: 34.74, longitude: 10.76, puissanceKwc: 4,
+    orientation: 'sud', pente: 'moyenne' },
+  { chercher: async () => { rappele = true; throw new Error('ne doit pas arriver'); } });
+  assert.equal(r2.ok, true);
+  assert.equal(r2.depuisCache, true);
+  assert.equal(rappele, false);
+
+  // Un paramètre qui change relance vraiment l'appel.
+  let relance = false;
+  await production({ latitude: 34.74, longitude: 10.76, puissanceKwc: 6,
+    orientation: 'sud', pente: 'moyenne' },
+  { chercher: async (u) => { relance = true; return faux(u); } });
+  assert.equal(relance, true, 'changer la puissance doit relancer le calcul');
+
+  config.definirRelais(null);
+  cache.vider();
+});
+
+test('un service en panne ne casse rien et le dit sans jargon', async () => {
+  config.definirRelais('https://exemple.tn/api/pvgis');
+  cache.vider();
+  const cas = [
+    [async () => ({ ok: false, status: 503 }), 'indisponible'],
+    [async () => ({ ok: false, status: 400 }), 'parametres'],
+    [async () => ({ ok: false, status: 429 }), 'trafic'],
+    [async () => { const e = new Error('coupé'); e.name = 'AbortError'; throw e; }, 'delai'],
+    [async () => ({ ok: true, status: 200, json: async () => ({}) }), 'reponse'],
+  ];
+  for (const [chercher, attendu] of cas) {
+    const r = await production({ latitude: 34.74, longitude: 10.76, puissanceKwc: 4,
+      orientation: 'sud', pente: 'moyenne' }, { chercher });
+    assert.equal(r.ok, false, `${attendu} : la réponse aurait dû échouer`);
+    assert.equal(r.genre, attendu);
+    assert.ok(r.messageClient.length > 40);
+    assert.ok(!/Error|fetch|HTTP|CORS|undefined/.test(r.messageClient), r.messageClient);
+  }
+  config.definirRelais(null);
+  cache.vider();
+});
+
+/* ------------------------------------------------------------------ */
+/* L'intégration est réelle, pas décorative                            */
+/* ------------------------------------------------------------------ */
+
+test('UNE MESURE AU POINT ENTRE DANS LE CALCUL, ELLE NE FAIT PAS QUE S’AFFICHER', () => {
+  // Afficher « productible mesuré : 1753 » tout en calculant la production
+  // sur 1650 serait le faux-semblant qu'un installateur découvre en refaisant
+  // l'addition. Ce test l'interdit.
+  const base = { consommationAnnuelle: 7200, montantAnnuel: 2040, gouvernorat: 'sfax',
+    orientation: 'sud', pente: 'moyenne', puissance: 4 };
+  const interne = etudier(base);
+  const mesure = etudier({ ...base, productibleMesure: 1753 });
+  assert.equal(interne.productible, productibleInterne('sfax'));
+  assert.equal(mesure.productible, 1753);
+  assert.notEqual(mesure.production, interne.production);
+  assert.equal(mesure.production, Math.round(4 * 1753));
+  assert.equal(interne.productibleMesure, false);
+  assert.equal(mesure.productibleMesure, true);
+});
+
+test('la mesure influence aussi la puissance recommandée', () => {
+  const base = { consommationAnnuelle: 20000, montantAnnuel: 5600, gouvernorat: 'sfax',
+    orientation: 'sud', pente: 'moyenne' };
+  const interne = etudier(base);
+  const plusEnsoleille = etudier({ ...base, productibleMesure: 2000 });
+  assert.ok(plusEnsoleille.puissance < interne.puissance,
+    'un site plus ensoleillé demande moins de kilowatts pour le même besoin');
+});
+
+test('une mesure absente ou aberrante retombe sur le référentiel, sans bruit', () => {
+  for (const mauvaise of [null, undefined, 0, -100, NaN, 'beaucoup']) {
+    assert.equal(productibleRetenu('sfax', mauvaise), productibleInterne('sfax'),
+      `valeur acceptée à tort : ${mauvaise}`);
+  }
+  assert.equal(productibleRetenu('sfax', 1753), 1753);
+});
+
+test('la fiche du site n’annonce une mesure que si le calcul l’a utilisée', () => {
+  // Les deux doivent bouger ensemble : la fiche lit ce qui a servi.
+  const sim = simuler({ consommationAnnuelle: 7200, montantAnnuel: 2040,
+    gouvernorat: 'sfax', orientation: 'sud', pente: 'moyenne', batiment: 'maison',
+    fiabilite: 'facture', moduleWc: 550, latitude: 34.74, longitude: 10.76,
+    originePosition: 'capteur' });
+  const mesureNonUtilisee = { ok: true, productible: tracer(1753, { source: 'calcul' }),
+    site: { altitude: tracer(23, { source: 'externe' }) }, origine: {} };
+  const f = fusionner(sim, { mesureService: mesureNonUtilisee });
+  // `entrees.productibleMesure` est absent : le calcul n'a pas utilisé la
+  // mesure, la fiche doit donc annoncer le référentiel interne.
+  assert.equal(f.profil.productible.source, 'interne');
 });

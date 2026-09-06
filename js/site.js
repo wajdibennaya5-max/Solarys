@@ -22,7 +22,7 @@ import { POSES, optimiser } from './calepinage.js';
 import { carteCentrale, grilleKpi, carteScore, avertissement, phraseCo2,
   panneauTechnique, bandeauNiveau, panneauAlertes, panneauTracabilite,
   panneauHypotheses } from './tableau.js';
-import { simuler } from './moteur.js';
+import { simuler, enrichirDepuisService } from './moteur.js';
 import { comparerJeux, listerParametres, jeu as jeuFinancier, NON_PRIS_EN_COMPTE }
   from './finances.js';
 import { optimiser as optimiserProjet, OBJECTIFS } from './optimiseur.js';
@@ -30,14 +30,18 @@ import { comparer as comparerVariantes, variantesProposees } from './laboratoire
 import { repondre as repondreCopilote, suggestions as suggestionsCopilote, MODES }
   from './copilote.js';
 import { panneauFinancier, panneauOptimiseur, panneauLaboratoire, panneauCopilote,
-  reponseCopilote, ficheSite, barreComposition, panneauProvenance } from './tableau.js';
+  reponseCopilote, ficheSite, barreComposition, panneauProvenance,
+  centreDonnees } from './tableau.js';
 import { fusionner, raconterComposition } from './fusion.js';
+import { definirRelais, disponible as serviceDisponible, ATTRIBUTION,
+  RAISON_INDISPONIBLE } from './pvgis/config.js';
 import { noter, proteger, surveiller, resume as resumeJournal, enTexte, CORRELATION }
   from './journal.js';
 import { dimensionner, verdictGlobal } from './technique.js';
 import { construireRapport } from './rapport.js';
 import { reponses, simulation, reinitialiserSimulation, cotesToit, reglagePose,
-  donneesEtude, etudeCourante, scenariosCourants } from './etat.js';
+  donneesEtude, etudeCourante, scenariosCourants, definirProductibleMesure }
+  from './etat.js';
 import { evaluer } from './score.js';
 import { animerChiffres, compter, mouvementReduit } from './anime.js';
 import { tousLesCas, DUREE as DUREE_VITRE } from './heros.js';
@@ -941,6 +945,7 @@ function dessinerResultat() {
     <p class="dash-co2" id="phraseCo2"></p>
 
     <div id="bandeauNiveau"></div>
+    <div id="centreDonnees"></div>
     <div id="ficheSite"></div>
     <div id="blocAlertes"></div>
 
@@ -1148,6 +1153,7 @@ function dessinerResultat() {
   $('resultat').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   brancherRapport();
+  interrogerService();
   proteger('optimiseur', () => brancherOptimiseur());
   proteger('assistant', () => brancherCopilote());
   brancherDiagnostic();
@@ -1247,6 +1253,11 @@ let simulationCourante = null;
 /** La dernière étude étiquetée, pour l'assistant et le rapport. */
 let fusionCourante = null;
 
+/** Ce que le service de données solaires a rendu, et dans quel état il est. */
+let mesureService = null;
+let etatService = serviceDisponible() ? 'attente' : 'absent';
+let avertissementService = RAISON_INDISPONIBLE;
+
 /** Les noms lisibles des valeurs suivies. */
 const NOMS_VALEURS = {
   consommation: 'Consommation annuelle',
@@ -1295,6 +1306,53 @@ function dessinerLaboratoire(e) {
   if (!d) { hote.innerHTML = ''; return; }
   hote.innerHTML = panneauLaboratoire(
     comparerVariantes(d, variantesProposees(d, { puissanceCourante: e.puissance })));
+}
+
+/**
+ * INTERROGE LE SERVICE DE DONNÉES SOLAIRES, sans jamais faire attendre.
+ *
+ * L'étude est déjà affichée quand cet appel part : le visiteur a ses chiffres,
+ * et le service ne fait que les affiner. S'il répond, la page se redessine
+ * avec le productible mesuré au point ; s'il ne répond pas, rien ne bouge et
+ * le panneau le dit. C'est l'ordre qui compte : afficher d'abord, enrichir
+ * ensuite. L'inverse ferait attendre tout le monde pour le bénéfice de
+ * quelques-uns.
+ */
+async function interrogerService() {
+  if (!serviceDisponible()) { etatService = 'absent'; return; }
+  const d = donneesEtude();
+  const e = etudeCourante();
+  if (!d || !e) return;
+
+  etatService = 'encours';
+  $('centreDonnees').innerHTML = centreDonnees({
+    configure: true, etat: 'encours', mesure: null, avertissement: null });
+
+  const r = await enrichirDepuisService(d, { puissance: e.puissance });
+  if (r.ok) {
+    mesureService = r.mesure;
+    etatService = 'ok';
+    // LE CHIFFRE MESURÉ ENTRE DANS LE CALCUL, il ne se contente pas de
+    // s'afficher : sans cette ligne, la fiche du site annoncerait un
+    // productible que la production ne refléterait pas.
+    definirProductibleMesure(r.productibleApres);
+    noter('info', 'données solaires obtenues', {
+      depuisCache: r.depuisCache,
+      productibleAvant: r.productibleAvant,
+      productibleApres: r.productibleApres,
+    });
+  } else {
+    mesureService = null;
+    etatService = 'echec';
+    definirProductibleMesure(null);
+    avertissementService = r.messageClient;
+    noter('avertissement', 'données solaires indisponibles', { genre: r.genre });
+  }
+  rafraichir();
+  $('reessayerService')?.addEventListener('click', () => {
+    avertissementService = RAISON_INDISPONIBLE;
+    interrogerService();
+  });
 }
 
 /** Le journal, consultable et copiable par le visiteur qui signale une panne. */
@@ -1504,7 +1562,14 @@ function rafraichir() {
   // LA FUSION étiquette chaque valeur avec son origine. Elle ne calcule
   // rien : elle dit d'où vient ce qui a déjà été calculé.
   fusionCourante = proteger('provenance des données',
-    () => fusionner(simulationCourante), null);
+    () => fusionner(simulationCourante, { mesureService }), null);
+  $('centreDonnees').innerHTML = centreDonnees({
+    configure: serviceDisponible(),
+    etat: etatService,
+    mesure: mesureService,
+    avertissement: avertissementService,
+    attribution: mesureService?.ok ? ATTRIBUTION : null,
+  });
   $('ficheSite').innerHTML = fusionCourante ? ficheSite(fusionCourante) : '';
   $('zoneComposition').innerHTML = fusionCourante
     ? barreComposition(fusionCourante, raconterComposition(fusionCourante.composition)) : '';
@@ -1758,6 +1823,33 @@ function brancherVitre() {
  */
 for (const lien of document.querySelectorAll('link[data-polices]')) {
   if (lien.media === 'print') lien.media = 'all';
+}
+
+/**
+ * Le relais vers le service de données solaires se déclare dans la page :
+ *
+ *     <meta name="pvgis-relais" content="https://…/api/pvgis">
+ *
+ * Le contrôleur le lit et le transmet à la couche d'intégration, qui ne
+ * connaît pas le document. Sans balise, la plateforme reste sur son
+ * référentiel interne — état normal, et chaque valeur l'indique.
+ */
+const relaisDeclare = document.querySelector('meta[name="pvgis-relais"]')?.content?.trim();
+definirRelais(relaisDeclare);
+noter('info', 'service de données solaires',
+  { relais: serviceDisponible() ? 'configuré' : 'non configuré' });
+
+// LE RELAIS DOIT FIGURER DANS `connect-src` DE LA POLITIQUE DE SÉCURITÉ.
+// Sinon le navigateur bloque l'appel sans que le code s'en aperçoive : le
+// service paraît simplement indisponible, et on cherche des heures du côté
+// du serveur. Ce contrôle nomme la cause dans le journal.
+if (relaisDeclare && serviceDisponible()) {
+  const csp = document.querySelector('meta[http-equiv="Content-Security-Policy"]')
+    ?.content ?? '';
+  const hote = (() => { try { return new URL(relaisDeclare).origin; } catch { return ''; } })();
+  if (hote && !csp.includes(hote)) {
+    noter('avertissement', 'relais absent de la politique de sécurité', { hote });
+  }
 }
 
 surveiller((message) => {

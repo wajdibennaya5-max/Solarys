@@ -71,6 +71,24 @@ export const HYPOTHESES = {
 export const PUISSANCE = { min: 1, max: 30, pas: 0.5 };
 
 /**
+ * LE PRODUCTIBLE RÉELLEMENT UTILISÉ PAR LE CALCUL.
+ *
+ * Quand un service de données solaires a mesuré le rayonnement AU POINT, sa
+ * valeur remplace celle de notre référentiel par gouvernorat. Sinon on garde
+ * la nôtre.
+ *
+ * Ce n'est pas une commodité : c'est ce qui distingue une vraie intégration
+ * d'un décor. Afficher « productible mesuré : 1753 » tout en calculant la
+ * production sur 1650 serait exactement le faux-semblant qu'un installateur
+ * découvre en refaisant l'addition — et il ne reviendrait pas.
+ */
+export function productibleRetenu(gouvernorat, mesure = null) {
+  const m = Number(mesure);
+  if (Number.isFinite(m) && m > 0) return m;
+  return productible(gouvernorat);
+}
+
+/**
  * LA PART AUTOCONSOMMÉE DÉPEND DE LA TAILLE — et l'ignorer fausse tout.
  *
  * Le soleil produit à midi ; le foyer consomme le soir. Une petite
@@ -155,8 +173,9 @@ export function prixDuKwh({ consommationAnnuelle, montantAnnuel }) {
  */
 export function puissanceRecommandee({
   consommationAnnuelle, gouvernorat, surfaceDisponible, orientation, pente,
+  productibleMesure = null,
 }) {
-  const rendement = productible(gouvernorat);
+  const rendement = productibleRetenu(gouvernorat, productibleMesure);
   const kwh = Number(consommationAnnuelle);
   if (!rendement || !(kwh > 0)) return null;
 
@@ -192,12 +211,13 @@ export function puissanceRecommandee({
 export function etudier({
   consommationAnnuelle, montantAnnuel, gouvernorat, surfaceDisponible = 0,
   puissance = null, orientation = null, pente = null, hypotheses = HYPOTHESES,
-  batiment = TYPE_DEFAUT, moduleWc = 550,
+  batiment = TYPE_DEFAUT, moduleWc = 550, productibleMesure = null,
 }) {
   const prixKwh = prixDuKwh({ consommationAnnuelle, montantAnnuel });
-  const rendement = productible(gouvernorat);
+  const rendement = productibleRetenu(gouvernorat, productibleMesure);
   const kwc = puissance ?? puissanceRecommandee({
-    consommationAnnuelle, gouvernorat, surfaceDisponible, orientation, pente });
+    consommationAnnuelle, gouvernorat, surfaceDisponible, orientation, pente,
+    productibleMesure });
   if (!prixKwh || !rendement || !kwc) return null;
 
   // Sans orientation renseignée, on ne pénalise pas : le visiteur n'a pas
@@ -253,6 +273,9 @@ export function etudier({
     puissance: kwc,
     production: Math.round(production),
     productible: rendement,
+    /** Le productible vient-il d'une mesure au point, ou de notre référentiel ? */
+    productibleMesure: Number.isFinite(Number(productibleMesure))
+      && Number(productibleMesure) > 0,
     /** Ce que l'orientation retranche, ou 1 quand elle n'est pas connue. */
     facteurOrientation: facteur,
     /** Production mois par mois : un client veut savoir ce que donne décembre. */

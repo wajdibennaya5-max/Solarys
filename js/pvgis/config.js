@@ -22,10 +22,36 @@
  */
 
 /**
- * L'adresse du relais, sur notre serveur. `null` tant qu'il n'est pas en
- * service — et c'est un état normal, pas une panne.
+ * L'adresse du relais, sur notre serveur.
+ *
+ * ELLE SE RÈGLE DANS `index.html`, EN UNE LIGNE :
+ *
+ *     <meta name="pvgis-relais" content="https://20122011.xyz/api/pvgis">
+ *
+ * Le contrôleur lit cette balise au démarrage et appelle `definirRelais()`.
+ * Sans elle, la valeur reste `null` et la plateforme fonctionne sur son
+ * référentiel interne — ce qui est un état normal, pas une panne. Mettre
+ * l'adresse dans le HTML plutôt que dans le JavaScript permet de basculer
+ * sans toucher au code, et de couper le service en une seconde si le serveur
+ * tombe.
  */
-export const RELAIS = null;
+let relais = null;
+
+export const RELAIS = () => relais;
+
+/**
+ * Règle l'adresse du relais. Appelée par le contrôleur au démarrage, avec ce
+ * qu'il a lu dans la page — ce fichier ne connaît pas le document, et ne doit
+ * pas le connaître : c'est ce qui le garde testable sans navigateur.
+ *
+ * HTTPS SEULEMENT. Un relais en clair exposerait les coordonnées du visiteur
+ * sur le réseau, et une adresse relative permettrait à une page compromise de
+ * détourner les requêtes.
+ */
+export function definirRelais(url) {
+  relais = (typeof url === 'string' && /^https:\/\//.test(url)) ? url : null;
+  return relais;
+}
 
 /** Version de l'API interrogée. Figure dans chaque résultat. */
 export const VERSION_API = 'v5_3';
@@ -137,7 +163,7 @@ export const ATTRIBUTION = {
 };
 
 /** Le service est-il utilisable en l'état ? */
-export const disponible = () => typeof RELAIS === 'string' && RELAIS.length > 0;
+export const disponible = () => typeof relais === 'string' && relais.length > 0;
 
 /**
  * Ce qu'on répond quand il ne l'est pas — sans dramatiser : la plateforme
