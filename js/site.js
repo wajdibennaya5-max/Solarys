@@ -10,6 +10,8 @@ import { HYPOTHESES, PUISSANCE } from './etude.js';
 import { formater, formaterRond, echapper } from './prix.js';
 import { localiser, REFUS, gouvernoratLePlusProche, enTunisie } from './geo.js';
 import { lireCoordonnees, decrire, formater as formaterPoint } from './localisation.js';
+import { mesurer as mesurerToit, etalonner,
+  azimutProbableDuPan, orientationLaPlusProche } from './toiture.js';
 import { definirFond, fondActif, capacites as capacitesCarte,
   hotesAAutoriser } from './carte/fonds.js';
 import { creerCarte } from './vues/carte.js';
@@ -432,6 +434,55 @@ const ETAPES = [
     <p class="indice">Les cotes sont facultatives — mais ce sont elles qui
       permettent de placer les panneaux sur VOTRE toit plutôt que sur un toit
       moyen. Un mètre ruban et deux minutes suffisent.</p>
+
+    <details class="repli" id="tracageToit">
+      <summary>Dessiner le toit sur la carte
+        <span class="repli-etat" id="traceEtat">non tracé</span></summary>
+
+      <p class="indice">Suivez le bord du toit point par point. La surface, le
+        périmètre et l’orientation de chaque côté se calculent au fur et à
+        mesure. Tirez un point pour le corriger sans tout recommencer.</p>
+
+      <div id="carteToit" class="carte-boite"></div>
+
+      <div class="outils" role="group" aria-label="Outils de tracé">
+        <button type="button" class="btn fantome" id="traceDefaire">Annuler le point</button>
+        <button type="button" class="btn fantome" id="traceVider">Effacer le tracé</button>
+        <button type="button" class="btn fantome" id="traceCadrer">Cadrer</button>
+        <button type="button" class="btn or" id="traceAppliquer" disabled>
+          Reprendre ces cotes</button>
+      </div>
+
+      <div id="traceMesures"></div>
+
+      <details class="repli" id="etalonnageToit">
+        <summary>L’échelle ne tombe pas juste ?
+          <span class="repli-etat" id="etalonEtat">non étalonné</span></summary>
+        <p class="indice">Une image aérienne n’est pas une carte au cordeau : prise
+          de vue oblique, relief, géoréférencement. Mesurez une longueur connue sur
+          place — une façade, un mur —, tracez-la ici, et l’échelle se corrige.
+          La correction reste visible.</p>
+        <div class="duo">
+          <div class="champ">
+            <label for="etalonTrace">Longueur lue sur le tracé (m)</label>
+            <input id="etalonTrace" type="number" inputmode="decimal" min="0"
+              step="0.01" readonly aria-readonly="true">
+          </div>
+          <div class="champ">
+            <label for="etalonReel">Longueur mesurée sur place (m)</label>
+            <input id="etalonReel" type="number" inputmode="decimal" min="0"
+              max="500" step="0.01" placeholder="8.40">
+          </div>
+        </div>
+        <p class="indice">La longueur lue est celle du dernier côté tracé.
+          Tracez d’abord la référence, puis saisissez sa mesure réelle.</p>
+        <div class="outils">
+          <button type="button" class="btn fantome" id="etalonAppliquer">Corriger l’échelle</button>
+          <button type="button" class="btn fantome" id="etalonAnnuler">Revenir à l’échelle d’origine</button>
+        </div>
+        <p class="indice" id="etalonMot" role="status" aria-live="polite"></p>
+      </details>
+    </details>
     <details class="repli"><summary>Je ne sais pas l’orientation</summary>
       <p>Placez-vous devant votre bâtiment, face à la façade principale. Au
       milieu de la journée, le soleil est au sud : le pan qui reçoit le plus de
@@ -442,6 +493,11 @@ const ETAPES = [
       orientation: $('orientation')?.value ?? 'sud',
       L: Number($('toitL')?.value) || 0,
       P: Number($('toitP')?.value) || 0,
+      // LE TRACÉ NE VIT PAS DANS LE FORMULAIRE. Sans cette ligne, la première
+      // sauvegarde venue reconstruisait `reponses.toit` à partir des quatre
+      // champs visibles et emportait le contour avec elle : un quart d'heure
+      // de tracé disparaissait au rechargement, sans message ni trace.
+      trace: reponses.toit?.trace ?? null,
     }),
     valide: (v) => {
       // Les deux cotes vont ensemble : une seule ne dessine aucun toit.
@@ -508,8 +564,27 @@ function memoriser(fini = false) {
   return enregistrer({ etape, fini, reponses });
 }
 
-/** Les clés qu'une simulation peut légitimement contenir. */
+/**
+ * Les étapes du parcours, dans l'ordre. Ce sont elles qu'on compte devant le
+ * visiteur, et elles qui disent jusqu'où une reprise peut aller.
+ */
 const CLES = ETAPES.map((e) => e.cle);
+
+/**
+ * Ce qu'une simulation enregistrée a le droit de contenir.
+ *
+ * Distinct des étapes, et pour une raison précise. `position` n'est l'étape de
+ * personne : elle se remplit par le capteur, la carte ou la saisie, à côté du
+ * gouvernorat. Tant qu'elle manquait à cette liste, elle était **enregistrée
+ * puis jetée à la reprise** — le visiteur retrouvait son gouvernorat mais
+ * perdait le point exact, donc l'altitude, donc les données solaires locales,
+ * sans que rien ne le signale.
+ *
+ * L'ajouter aux étapes aurait été pire : le bandeau aurait annoncé « 4
+ * réponses sur 6 » pour un parcours qui en compte cinq, et la reprise se
+ * serait arrêtée à une étape qui n'existe pas.
+ */
+const CLES_STOCKEES = [...CLES, 'position'];
 
 /**
  * Ne garde d'un état relu que ce que la version actuelle sait afficher.
@@ -521,7 +596,7 @@ const CLES = ETAPES.map((e) => e.cle);
 function reponsesRetenues(brutes) {
   const propres = {};
   if (!brutes || typeof brutes !== 'object') return propres;
-  for (const cle of CLES) {
+  for (const cle of CLES_STOCKEES) {
     if (brutes[cle] !== undefined && brutes[cle] !== null) propres[cle] = brutes[cle];
   }
   return propres;
@@ -541,7 +616,11 @@ function proposerReprise() {
   if (!memoire) return;
 
   const gardees = reponsesRetenues(memoire.etat?.reponses);
-  const combien = Object.keys(gardees).length;
+  if (!Object.keys(gardees).length) { effacer(); return; }
+  // On compte les ÉTAPES franchies, pas les clés rangées : la position n'en
+  // est pas une, et l'annoncer comme telle donnerait « 4 réponses sur 6 »
+  // devant un parcours qui en compte cinq.
+  const combien = CLES.filter((c) => gardees[c] !== undefined).length;
   if (!combien) { effacer(); return; }
 
   const fini = memoire.etat?.fini === true && combien === CLES.length;
@@ -691,6 +770,7 @@ function dessinerEtape() {
     saisi.focus({ preventScroll: true });
   }
   brancherLocalisation();
+  brancherTracage();
   brancherOrientation();
   brancherConsommation();
   brancherBatiment();
@@ -1025,6 +1105,221 @@ function brancherCarte() {
     mot.textContent = cap.phrase + (fond?.avertissement ? ` ${fond.avertissement}` : '');
     mot.className = `indice${cap.image ? '' : ' indice-absent'}`;
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* MODULE 2 — DESSINER ET MESURER LE TOIT                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * POURQUOI CE MODULE EXISTE.
+ *
+ * Le formulaire demandait deux cotes et en déduisait un rectangle. Un toit
+ * tunisien réel a un décroché, une terrasse, un pan coupé — et surtout,
+ * personne ne connaît ses cotes par cœur, alors qu'on sait très bien suivre
+ * le bord de sa maison du doigt sur une image.
+ *
+ * CE QUE CE MODULE NE FAIT PAS : il ne calcule aucune longueur. Tout vient de
+ * `toiture.js`. Le contrôleur pose des points, le domaine les mesure, la vue
+ * les dessine. Trois responsabilités, trois fichiers, un seul chemin de calcul.
+ *
+ * CE QU'IL N'AFFIRME JAMAIS : qu'une mesure lue sur une image est une cote
+ * relevée. La réserve accompagne chaque chiffre, et l'application des cotes au
+ * formulaire ne les transforme pas en certitudes.
+ */
+let carteToit = null;
+let sommetsToit = [];
+let facteurEchelle = 1;
+let echelleEtalonnee = false;
+
+/** La pente déclarée, en degrés — c'est elle qui donne le rampant. */
+function penteDegres() {
+  const id = $('pente')?.value ?? reponses.toit?.pente ?? 'moyenne';
+  return { plat: 0, faible: 15, moyenne: 30, forte: 45 }[id] ?? 30;
+}
+
+/** Les mesures courantes du tracé, telles que le domaine les rend. */
+const mesuresToit = () => mesurerToit(sommetsToit, {
+  pente: penteDegres(), facteur: facteurEchelle, etalonne: echelleEtalonnee,
+});
+
+/** Redessine le tracé, ses cotes et le tableau de mesures. */
+function majTrace() {
+  const m = mesuresToit();
+  carteToit?.definirTrace({ sommets: sommetsToit, cotes: m.cotes });
+
+  const etat = $('traceEtat');
+  if (etat) {
+    etat.textContent = m.exploitable
+      ? `${m.surfaceRampant.toFixed(1)} m²`
+      : (sommetsToit.length ? `${sommetsToit.length} point${
+        sommetsToit.length > 1 ? 's' : ''}` : 'non tracé');
+    etat.className = `repli-etat repli-${m.exploitable ? 'bonne' : 'vide'}`;
+  }
+
+  const appliquer = $('traceAppliquer');
+  if (appliquer) appliquer.disabled = !m.exploitable;
+
+  // La dernière cote sert de référence d'étalonnage : c'est celle que
+  // l'utilisateur vient de tracer, donc celle qu'il a en tête.
+  const ref = m.cotes.length ? m.cotes[m.cotes.length - 1] : null;
+  const champRef = $('etalonTrace');
+  if (champRef) champRef.value = ref ? ref.longueur.toFixed(2) : '';
+
+  const zone = $('traceMesures');
+  if (!zone) return;
+  if (!sommetsToit.length) {
+    zone.innerHTML = `<p class="indice">Appuyez sur la carte pour poser le premier
+      point du contour.</p>`;
+    return;
+  }
+  if (!m.exploitable) {
+    zone.innerHTML = `<p class="alerte-trace">${echapper(m.probleme.message)}</p>`;
+    return;
+  }
+  zone.innerHTML = ficheMesures(m);
+}
+
+/** Le tableau de mesures — présentation pure, aucun calcul. */
+function ficheMesures(m) {
+  const ligne = (nom, valeur) => `<div class="pos-l"><dt>${nom}</dt>
+    <dd>${valeur}</dd></div>`;
+  const pan = m.faitageProbable;
+  const azPan = azimutProbableDuPan(m);
+  return `<dl class="pos-faits mesures">
+    ${ligne('Surface au sol (vue du ciel)', `${m.surfaceProjetee.toFixed(1)} m²`)}
+    ${ligne(`Surface du rampant (pente ${m.pente}°)`,
+    `<b>${m.surfaceRampant.toFixed(1)} m²</b>`)}
+    ${ligne('Supplément dû à la pente', `+ ${m.supplementPente.toFixed(1)} m²`)}
+    ${ligne('Périmètre', `${m.perimetre.toFixed(1)} m`)}
+    ${ligne('Points du contour', String(m.points))}
+    ${ligne('Côté le plus long', pan
+    ? `${pan.longueur.toFixed(1)} m, orienté ${pan.capEnClair}` : '—')}
+    ${azPan !== null ? ligne('Orientation probable du pan',
+    `azimut ${Math.round(azPan)}° (0 = plein sud)`) : ''}
+    ${m.etalonne ? ligne('Échelle corrigée',
+    `× ${m.facteur.toFixed(3)}`) : ''}
+  </dl>
+  <p class="pos-phrase reserve">${echapper(m.reserve)}</p>`;
+}
+
+/** Reporte les mesures du tracé dans les cotes du formulaire. */
+function appliquerTrace() {
+  const m = mesuresToit();
+  if (!m.exploitable) return;
+  // On ne remplace pas un toit réel par un rectangle en douce : le formulaire
+  // attend deux cotes, on lui donne le rectangle de MÊME SURFACE que le
+  // rampant, dans les proportions du tracé — et on le dit.
+  const cotesTriees = [...m.cotes].sort((a, b) => b.longueur - a.longueur);
+  const L = cotesTriees[0]?.longueur ?? 0;
+  const P = L > 0 ? m.surfaceRampant / L : 0;
+  if ($('toitL')) $('toitL').value = L.toFixed(1);
+  if ($('toitP')) $('toitP').value = P.toFixed(1);
+
+  // La liste du formulaire ne connaît que huit directions ; le tracé donne un
+  // angle exact. On retient la plus proche — le choix est fait par le domaine,
+  // sous test, parce que c'est exactement là qu'une erreur de signe avait
+  // déclaré plein nord un pan plein sud.
+  const azPan = azimutProbableDuPan(m);
+  const proche = azPan === null ? null
+    : orientationLaPlusProche(azPan, AZIMUTS_FORMULAIRE);
+  if (proche && $('orientation')) $('orientation').value = proche.id;
+
+  reponses.toit = { ...(reponses.toit ?? {}), L: Number(L.toFixed(1)),
+    P: Number(P.toFixed(1)), pente: $('pente')?.value ?? 'moyenne',
+    orientation: $('orientation')?.value ?? 'sud',
+    trace: { sommets: sommetsToit, facteur: facteurEchelle,
+      etalonne: echelleEtalonnee, surface: m.surfaceRampant } };
+  majOrientation();
+  memoriser();
+
+  const zone = $('traceMesures');
+  if (zone) {
+    zone.insertAdjacentHTML('afterbegin',
+      `<p class="pos-phrase applique">Cotes reprises : ${L.toFixed(1)} m ×
+        ${P.toFixed(1)} m, soit la surface du rampant tracé
+        (${m.surfaceRampant.toFixed(1)} m²) ramenée à un rectangle équivalent.
+        Le contour exact reste enregistré.</p>`);
+  }
+}
+
+/** Les azimuts de la liste du formulaire, dans la convention du projet. */
+const AZIMUTS_FORMULAIRE = { sud: 0, 'sud-est': -45, 'sud-ouest': 45,
+  est: -90, ouest: 90, 'nord-est': -135, 'nord-ouest': 135, nord: 180 };
+
+/** L'étalonnage manuel de l'échelle. */
+function brancherEtalonnage() {
+  const mot = $('etalonMot');
+  $('etalonAppliquer')?.addEventListener('click', () => {
+    const r = etalonner(Number($('etalonTrace')?.value), Number($('etalonReel')?.value));
+    if (mot) mot.textContent = r.message;
+    if (mot) mot.className = `indice${r.ok ? '' : ' indice-absent'}`;
+    if (!r.ok) return;
+    facteurEchelle = r.facteur;
+    echelleEtalonnee = true;
+    const etat = $('etalonEtat');
+    if (etat) {
+      etat.textContent = `${r.ecart > 0 ? '+' : ''}${r.ecart} %`;
+      etat.className = 'repli-etat repli-bonne';
+    }
+    majTrace();
+    memoriser();
+  });
+  $('etalonAnnuler')?.addEventListener('click', () => {
+    facteurEchelle = 1;
+    echelleEtalonnee = false;
+    if (mot) { mot.textContent = 'Échelle d’origine rétablie.'; mot.className = 'indice'; }
+    const etat = $('etalonEtat');
+    if (etat) { etat.textContent = 'non étalonné'; etat.className = 'repli-etat repli-vide'; }
+    majTrace();
+    memoriser();
+  });
+}
+
+/** Branche l'étape de tracé du toit. */
+function brancherTracage() {
+  const boite = $('carteToit');
+  carteToit?.detruire();
+  carteToit = null;
+  if (!boite) return;
+
+  // On repart du tracé mémorisé : revenir en arrière ne doit pas effacer un
+  // quart d'heure de travail.
+  const memoire = reponses.toit?.trace;
+  if (memoire && Array.isArray(memoire.sommets) && !sommetsToit.length) {
+    sommetsToit = memoire.sommets;
+    facteurEchelle = Number(memoire.facteur) || 1;
+    echelleEtalonnee = Boolean(memoire.etalonne);
+  }
+
+  const p = position();
+  carteToit = creerCarte(boite, {
+    point: { latitude: p.latitude ?? 36.8065, longitude: p.longitude ?? 10.1815 },
+    // Un toit se trace au plus près : à un zoom plus large, un pixel vaut
+    // plus d'un mètre et le tracé ne veut plus rien dire.
+    zoom: 19,
+    surSommet: (q) => { sommetsToit = [...sommetsToit, q]; majTrace(); },
+    surSommetDeplace: (i, q) => {
+      sommetsToit = sommetsToit.map((s, j) => (j === i ? q : s));
+      majTrace();
+    },
+  });
+  carteToit?.definirMode('trace');
+  if (sommetsToit.length) carteToit?.cadrerSur(sommetsToit);
+
+  $('traceDefaire')?.addEventListener('click', () => {
+    sommetsToit = sommetsToit.slice(0, -1);
+    majTrace();
+  });
+  $('traceVider')?.addEventListener('click', () => {
+    sommetsToit = [];
+    majTrace();
+  });
+  $('traceCadrer')?.addEventListener('click', () => carteToit?.cadrerSur(sommetsToit));
+  $('traceAppliquer')?.addEventListener('click', appliquerTrace);
+  $('pente')?.addEventListener('change', majTrace);
+  brancherEtalonnage();
+  majTrace();
 }
 
 /** Branche l'ensemble de l'étape de localisation. */

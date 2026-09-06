@@ -1046,8 +1046,13 @@ footer .bas{margin-top:36px;padding-top:20px;border-top:1px solid rgba(255,255,2
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
 /* ---- Localisation professionnelle : carte, repère, fiche de position ---- */
-.carte-boite{height:300px;margin:14px 0 8px;border-radius:14px;overflow:hidden}
-.carte-vue{position:relative;width:100%;height:100%;overflow:hidden;
+/* LA HAUTEUR APPARTIENT AU CONTENEUR, PAS AU COMPOSANT.
+   `creerCarte` pose `carte-vue` SUR l'élément qui porte déjà `carte-boite` :
+   un `height:100%` dans `.carte-vue` écrasait donc les 300 px du conteneur et
+   la carte tombait à deux pixels de haut — invisible, et surtout impossible à
+   toucher. Le composant ne fixe plus qu'un plancher. */
+.carte-boite{height:320px;margin:14px 0 8px;border-radius:14px;overflow:hidden}
+.carte-vue{position:relative;width:100%;min-height:220px;overflow:hidden;
   background:var(--surface-2,#eef1f5);border:1px solid var(--bord);border-radius:14px;
   touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
 .carte-vue:active{cursor:grabbing}
@@ -1128,8 +1133,32 @@ footer .bas{margin-top:36px;padding-top:20px;border-top:1px solid rgba(255,255,2
 .pos-vide .pos-phrase{font-weight:700}
 .indice-absent{color:var(--argile,#a4632a);font-weight:600}
 @media (min-width:520px){.pos-faits{grid-template-columns:1fr 1fr;gap:4px 22px}}
-@media (max-width:400px){.carte-boite{height:250px}
+@media (max-width:400px){.carte-boite{height:270px}
   .carte-attribution{max-width:58%;font-size:9.5px}}
+
+/* ---- Tracé du toit : calque, cotes, outils ---- */
+.carte-calque{position:absolute;inset:0;pointer-events:none;overflow:visible}
+.carte-vue.carte-trace{cursor:crosshair}
+.carte-repere.efface{display:none}
+.trace-surface{fill:rgba(232,163,61,.24);stroke:var(--or);stroke-width:2.5;
+  stroke-linejoin:round}
+.trace-cote{stroke:var(--or);stroke-width:2.5;stroke-linecap:round}
+.trace-sommet{fill:#fff;stroke:var(--or);stroke-width:2.5}
+.trace-sommet.premier{fill:var(--or);stroke:#fff}
+.trace-cote-fond{fill:rgba(255,255,255,.88)}
+.trace-cote-txt{font:700 11px/1 system-ui,sans-serif;fill:var(--nuit)}
+
+.outils{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.outils .btn{flex:1 1 auto;min-height:42px;padding:9px 12px;font-size:13.5px}
+.alerte-trace{margin:12px 0 0;padding:11px 13px;border-radius:10px;font-size:13.5px;
+  font-weight:600;line-height:1.5;background:#fdf0d8;color:#8a5a10;
+  border:1px solid #e8c78a}
+.mesures{margin-top:12px}
+.mesures .pos-l dd b{font-size:15px}
+.pos-phrase.reserve{margin-top:10px;font-style:italic;font-size:12.5px}
+.pos-phrase.applique{margin:0 0 10px;padding:10px 12px;border-radius:10px;
+  background:#e4f5e8;color:#1c6b34;font-weight:600;font-size:13px;line-height:1.5}
+.repli .repli{margin-top:14px;background:var(--surface-2,#f6f8fa)}
 </style>
 </head>
 <body>

@@ -99,3 +99,95 @@ Au zoom 18 sous Tunis, un pixel vaut 0,478 m.
   site. Cette phrase accompagne le fond aérien en permanence.
 - Un plan des rues ne montre pas de toiture, et l'interface refuse de faire
   semblant du contraire.
+
+---
+
+# Dessiner et mesurer le toit
+
+## Pourquoi remplacer deux cotes par un tracé
+
+Le formulaire demandait une largeur et une profondeur, et en déduisait un
+rectangle. Un toit tunisien réel a un décroché, une terrasse, un pan coupé —
+et surtout **personne ne connaît ses cotes par cœur**, alors qu'on sait très
+bien suivre le bord de sa maison du doigt sur une image.
+
+Les deux cotes restent : le tracé les remplit, il ne les supprime pas.
+
+## Qui fait quoi
+
+| Fichier | Rôle |
+|---|---|
+| `toiture.js` (domaine) | mesure : aire, périmètre, cotes, caps, étalonnage |
+| `vues/carte.js` (vue) | dessine le contour et les cotes qu'on lui donne |
+| `site.js` (contrôleur) | pose les points, demande la mesure, l'affiche |
+
+**La vue ne mesure rien.** Elle reçoit des cotes déjà calculées. Deux chemins
+de calcul finiraient par diverger, et rien ne dirait lequel est faux.
+
+## Le piège qui coûte le plus cher
+
+Un tracé sur une image donne la surface **vue du ciel** — la projection
+horizontale. Un toit à 30° porte 15,5 % de surface de plus que son emprise au
+sol ; à 45°, 41 %. Confondre les deux fausse le nombre de panneaux, donc la
+puissance, donc le devis.
+
+Les deux surfaces sont donc affichées séparément, et le supplément dû à la
+pente est **isolé** plutôt que noyé dans un total.
+
+## Ce qu'un tracé raté ne produit jamais
+
+- **Moins de trois points** : pas de surface, et l'écran dit pourquoi.
+- **Un contour qui se recoupe** : refusé. Un polygone en nœud papillon a une
+  aire mathématiquement définie et physiquement absurde — les deux boucles se
+  soustraient. Sans ce contrôle, un tracé raté rendrait une surface *trop
+  petite*, sans rien dire.
+- **Quatre mètres carrés, ou vingt mille** : refusés, avec la cause probable
+  (zoom trop large, contour qui déborde sur le voisin).
+
+Un refus sans explication ne sert à rien : chaque message dit quoi corriger.
+
+## L'étalonnage manuel
+
+Une image aérienne n'est pas une carte au cordeau : prise de vue oblique,
+relief, erreur de géoréférencement. Deux mètres tracés à l'écran peuvent en
+valoir deux et dix — assez pour décaler une rangée de panneaux.
+
+Le remède est celui des géomètres : mesurer une longueur connue sur place, la
+retracer sur l'image, corriger l'échelle du rapport constaté. **Le facteur
+reste visible** : une correction cachée serait pire que pas de correction.
+
+Deux garde-fous :
+
+- Au-delà de ±40 %, la correction est **refusée**. À ce point ce n'est plus une
+  image imprécise, c'est un tracé qui ne porte pas sur la même chose que la
+  mesure ; corriger masquerait une erreur bien plus grave.
+- Le facteur porte sur les **longueurs**. Les surfaces varient donc en son
+  carré. L'appliquer tel quel aux mètres carrés donnerait une correction deux
+  fois trop faible — donc un nombre de panneaux faux. Un test le vérifie.
+
+## L'orientation déduite
+
+Le côté le plus long d'un toit est le plus souvent le faîtage ou l'égout : le
+pan regarde perpendiculairement. C'est une **déduction**, pas une mesure, et le
+champ s'appelle `faitageProbable`.
+
+L'azimut suit la convention du projet — **0 = plein sud**, celle de PVGIS —
+et le test se confronte à la table de `pvgis/parametres.js` plutôt que de la
+recopier. Mélanger deux conventions oriente des toits au nord en leur donnant
+l'ensoleillement du sud, et personne ne s'en aperçoit avant le chantier.
+
+Un défaut réel s'est produit là : le reste d'un nombre négatif est négatif en
+JavaScript, et l'écart angulaire rendait son complément. Un pan plein sud
+ressortait plein nord. Le calcul a quitté le contrôleur pour le domaine, où il
+est sous test.
+
+## Ce que le tracé ne devient jamais
+
+Reprendre les cotes ne transforme pas une lecture d'image en relevé. Le
+formulaire reçoit le rectangle de **même surface que le rampant**, dans les
+proportions du tracé, et le message le dit. Le contour exact reste enregistré.
+
+La réserve accompagne chaque chiffre, étalonnage compris :
+
+> Mesure estimée à partir de la carte. Une vérification sur site est
+> recommandée.
