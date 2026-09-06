@@ -30,7 +30,8 @@ import { comparer as comparerVariantes, variantesProposees } from './laboratoire
 import { repondre as repondreCopilote, suggestions as suggestionsCopilote, MODES }
   from './copilote.js';
 import { panneauFinancier, panneauOptimiseur, panneauLaboratoire, panneauCopilote,
-  reponseCopilote } from './tableau.js';
+  reponseCopilote, ficheSite, barreComposition, panneauProvenance } from './tableau.js';
+import { fusionner, raconterComposition } from './fusion.js';
 import { noter, proteger, surveiller, resume as resumeJournal, enTexte, CORRELATION }
   from './journal.js';
 import { dimensionner, verdictGlobal } from './technique.js';
@@ -839,6 +840,12 @@ function brancherLocalisation() {
     const liste = $('gouvernorat');
     liste.value = r.id;
     reponses.gouvernorat = r.id;
+    // On garde le point exact : le gouvernorat suffit à notre référentiel,
+    // pas à interroger un service de rayonnement, qui travaille au point.
+    reponses.position = {
+      latitude: r.latitude, longitude: r.longitude,
+      precision: r.precision, origine: r.origine,
+    };
     etat.textContent = `Vous semblez être à ${nomGouvernorat(r.id)}.`
       + ' Corrigez ci-dessous si ce n’est pas le bon gouvernorat.';
   });
@@ -934,6 +941,7 @@ function dessinerResultat() {
     <p class="dash-co2" id="phraseCo2"></p>
 
     <div id="bandeauNiveau"></div>
+    <div id="ficheSite"></div>
     <div id="blocAlertes"></div>
 
     <div class="bloc" id="blocScenarios">
@@ -1032,6 +1040,8 @@ function dessinerResultat() {
     <div class="bloc">
       <h4>Le détail</h4>
       <dl id="detail"></dl>
+      <div id="zoneComposition"></div>
+      <div id="zoneProvenance"></div>
       <div id="zoneTrace"></div>
       <div id="zoneHypotheses"></div>
       <div id="panneauTechnique"></div>
@@ -1233,6 +1243,23 @@ function demanderRafraichissement() {
 
 /** La dernière simulation complète, pour l'assistant et le rapport. */
 let simulationCourante = null;
+
+/** La dernière étude étiquetée, pour l'assistant et le rapport. */
+let fusionCourante = null;
+
+/** Les noms lisibles des valeurs suivies. */
+const NOMS_VALEURS = {
+  consommation: 'Consommation annuelle',
+  prixKwh: 'Prix du kilowattheure',
+  puissance: 'Puissance retenue',
+  production: 'Production annuelle',
+  tauxAutoconsommation: 'Part autoconsommée',
+  autoconsomme: 'Énergie consommée sur place',
+  economieAnnuelle: 'Économie la première année',
+  retour: 'Temps de retour',
+  co2Annuel: 'CO₂ évité',
+  productible: 'Productible du site',
+};
 
 /** L'objectif d'optimisation et le mode de l'assistant, choisis par le visiteur. */
 let objectifCourant = 'equilibre';
@@ -1474,6 +1501,16 @@ function rafraichir() {
   { puissance: simulation.puissance }), null);
   const ouverts = new Set([...document.querySelectorAll('#resultat details[open]')]
     .map((d) => d.id).filter(Boolean));
+  // LA FUSION étiquette chaque valeur avec son origine. Elle ne calcule
+  // rien : elle dit d'où vient ce qui a déjà été calculé.
+  fusionCourante = proteger('provenance des données',
+    () => fusionner(simulationCourante), null);
+  $('ficheSite').innerHTML = fusionCourante ? ficheSite(fusionCourante) : '';
+  $('zoneComposition').innerHTML = fusionCourante
+    ? barreComposition(fusionCourante, raconterComposition(fusionCourante.composition)) : '';
+  $('zoneProvenance').innerHTML = fusionCourante
+    ? panneauProvenance(fusionCourante, NOMS_VALEURS) : '';
+
   $('bandeauNiveau').innerHTML = bandeauNiveau(simulationCourante);
   $('blocAlertes').innerHTML = panneauAlertes(simulationCourante);
   $('zoneTrace').innerHTML = panneauTracabilite(simulationCourante);

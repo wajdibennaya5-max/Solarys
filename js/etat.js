@@ -17,6 +17,7 @@ import { etudier } from './etude.js';
 import { comparer } from './scenarios.js';
 import { moduleParId } from './materiel.js';
 import { TYPE_DEFAUT } from './batiment.js';
+import { CENTRES } from './geo.js';
 
 /** Les réponses du visiteur, étape par étape. */
 export const reponses = {};
@@ -84,7 +85,40 @@ export function donneesEtude() {
     pente: toit.pente ?? null,
     batiment: reponses.batiment ?? TYPE_DEFAUT,
     moduleWc: reglagePose().module.puissance,
+    moduleId: reglagePose().module.id,
+    ...position(),
   };
+}
+
+/**
+ * Le point exact, quand il est connu.
+ *
+ * Le gouvernorat suffit à notre référentiel de gisement ; il ne suffit pas à
+ * un service de rayonnement, qui travaille au point. Sans géolocalisation, on
+ * retombe sur le centre du gouvernorat, et on le DIT : c'est une position
+ * approchée de plusieurs dizaines de kilomètres, pas la toiture du client.
+ */
+export function position() {
+  const p = reponses.position ?? {};
+  if (Number.isFinite(p.latitude) && Number.isFinite(p.longitude)) {
+    return {
+      latitude: p.latitude,
+      longitude: p.longitude,
+      precisionPosition: Number.isFinite(p.precision) ? p.precision : null,
+      originePosition: p.origine ?? 'capteur',
+    };
+  }
+  const centre = CENTRES[reponses.gouvernorat];
+  if (centre) {
+    return {
+      latitude: centre.lat,
+      longitude: centre.lon,
+      precisionPosition: null,
+      originePosition: 'centre-gouvernorat',
+    };
+  }
+  return { latitude: null, longitude: null, precisionPosition: null,
+    originePosition: 'inconnue' };
 }
 
 /** L'étude, avec les réglages courants du tableau de bord. */

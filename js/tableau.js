@@ -577,3 +577,152 @@ export function reponseCopilote(r) {
       r.propositions.slice(0, 5).map((p) => `<li>${p}</li>`).join('')}</ul>` : ''}
   </div>`;
 }
+
+/* ------------------------------------------------------------------ */
+/* Provenance : la fiche du site, les origines, le détail d'un chiffre */
+/* ------------------------------------------------------------------ */
+
+const COURT = {
+  saisie: 'SAISIE', mesure: 'MESURE', externe: 'SOURCE', catalogue: 'CATALOGUE',
+  calcul: 'CALCUL', interne: 'INTERNE', hypothese: 'HYPOTHÈSE', absente: 'ABSENTE',
+};
+
+/** L'étiquette d'origine d'une valeur, à poser à côté d'elle. */
+export function etiquetteSource(v) {
+  const s = v?.source ?? 'absente';
+  return `<span class="orig orig-${s}" title="${
+    (v?.methode ?? '').replace(/"/g, '')}">${COURT[s] ?? s}</span>`;
+}
+
+/**
+ * LA FICHE DU SITE — ce que la plateforme sait du lieu, et d'où elle le sait.
+ *
+ * Le client doit pouvoir lire d'un coup « votre emplacement a été analysé »,
+ * et le professionnel doit pouvoir vérifier ligne par ligne ce qui a servi.
+ * Les deux lectures tiennent dans la même carte : l'une en haut, l'autre
+ * dépliée en dessous.
+ */
+export function ficheSite(fusion) {
+  const p = fusion?.profil;
+  if (!p) return '';
+  const c = fusion.confianceSite ?? { niveau: 'preliminaire', raisons: [] };
+  const nomConfiance = { elevee: 'Élevée', moyenne: 'Moyenne',
+    preliminaire: 'Préliminaire' }[c.niveau] ?? 'Préliminaire';
+
+  const ligne = (nom, v, ecrire = (x) => x) => {
+    const ok = v && v.source !== 'absente' && v.valeur !== null && v.valeur !== undefined;
+    return `<div class="site-l">
+      <dt>${nom}</dt>
+      <dd>${ok ? ecrire(v.valeur) : '<i>non disponible</i>'} ${etiquetteSource(v)}</dd>
+      ${!ok && v?.methode ? `<p class="site-abs">${v.methode}</p>` : ''}
+    </div>`;
+  };
+
+  return `<div class="site">
+    <div class="site-tete">
+      <div>
+        <p class="site-sur">Votre emplacement a été analysé</p>
+        <p class="site-lieu">${p.lieu ?? 'Lieu non déterminé'}</p>
+      </div>
+      <span class="site-conf site-conf-${c.niveau}">Qualité des données du site :
+        ${nomConfiance}</span>
+    </div>
+
+    <dl class="site-faits">
+      ${ligne('Latitude', p.latitude, (x) => `${x}°`)}
+      ${ligne('Longitude', p.longitude, (x) => `${x}°`)}
+      ${ligne('Précision de la position', p.precision, (x) => `± ${x} m`)}
+      ${ligne('Altitude', p.altitude, (x) => `${x} m`)}
+      ${ligne('Productible retenu', p.productible, (x) => `${x} kWh/kWc/an`)}
+      ${ligne('Base de données solaires', p.baseDonnees)}
+      ${ligne('Période couverte', p.periode)}
+      ${ligne('Relief environnant', p.horizon)}
+      ${ligne('Obstacles de toiture', p.obstacles)}
+    </dl>
+
+    <details class="site-detail">
+      <summary>Ce qui fixe cette qualité</summary>
+      <ul>${c.raisons.map((r) => `<li>${r}</li>`).join('')}</ul>
+      ${c.service ? `<p class="site-service">${c.service}</p>` : ''}
+      ${p.attribution ? `<p class="site-attrib">${p.attribution.mention}</p>` : ''}
+    </details>
+  </div>`;
+}
+
+/**
+ * LA COMPOSITION D'UNE ÉTUDE — de quoi elle est faite.
+ *
+ * Une phrase, et une barre. Un client qui lit « 2 données que vous avez
+ * saisies, 6 calculs, 2 hypothèses » sait immédiatement quoi contester.
+ */
+export function barreComposition(fusion, phrase) {
+  const c = fusion?.composition;
+  if (!c || !Object.keys(c).length) return '';
+  const total = Object.values(c).reduce((s, n) => s + n, 0);
+  const ordre = ['saisie', 'mesure', 'externe', 'catalogue', 'calcul', 'interne',
+    'hypothese', 'absente'];
+  return `<div class="compo">
+    <div class="compo-barre" role="img" aria-label="${phrase ?? ''}">
+      ${ordre.filter((k) => c[k]).map((k) => `<span class="compo-part orig-${k}"
+        style="flex:${c[k]}" title="${COURT[k]} : ${c[k]}"></span>`).join('')}
+    </div>
+    ${phrase ? `<p class="compo-txt">${phrase}</p>` : ''}
+    <div class="compo-legende">
+      ${ordre.filter((k) => c[k]).map((k) => `<span><i class="orig-${k}"></i>${
+        COURT[k]} ${c[k]}</span>`).join('')}
+      <span class="compo-total">${total} valeurs suivies</span>
+    </div>
+  </div>`;
+}
+
+/**
+ * « COMMENT CE CHIFFRE EST-IL CALCULÉ ? » — la réponse complète.
+ *
+ * Entrées, méthode, source, confiance, horodatage. C'est la transparence que
+ * demande un installateur avant d'engager sa signature, et elle ne coûte rien
+ * à celui qui n'en veut pas : elle est repliée.
+ */
+export function detailValeur(nom, v) {
+  if (!v) return '';
+  const s = v.source ?? 'absente';
+  const conf = { elevee: 'Élevée', moyenne: 'Moyenne',
+    preliminaire: 'Préliminaire' }[v.confiance] ?? 'Préliminaire';
+  const date = new Date(v.horodatage);
+  return `<div class="dv">
+    <p class="dv-tete"><span class="dv-nom">${nom}</span>
+      <span class="dv-val">${v.valeur === null ? 'non disponible'
+    : typeof v.valeur === 'number'
+      ? v.valeur.toLocaleString('fr-FR', { maximumFractionDigits: 3 }) : v.valeur}
+      ${v.unite ?? ''}</span></p>
+    <dl>
+      <div><dt>Origine</dt><dd>${etiquetteSource(v)} ${v.sourceNom ?? ''}</dd></div>
+      ${v.methode ? `<div><dt>Méthode</dt><dd>${v.methode}</dd></div>` : ''}
+      ${v.depuis?.length ? `<div><dt>Établie à partir de</dt><dd>${
+    v.depuis.map((d) => COURT[d.source] ?? d.source).join(', ')}</dd></div>` : ''}
+      <div><dt>Confiance</dt><dd>${conf}</dd></div>
+      <div><dt>Calculée le</dt><dd>${Number.isNaN(date.getTime()) ? '—'
+    : date.toLocaleString('fr-FR')}</dd></div>
+      ${v.details ? `<div><dt>Paramètres</dt><dd>${
+    Object.entries(v.details).slice(0, 6)
+      .map(([k, x]) => `${k} : ${typeof x === 'object' ? '…' : x}`).join(' · ')}</dd></div>`
+    : ''}
+    </dl>
+    ${s === 'hypothese' ? `<p class="dv-avert">C’est une hypothèse de travail, pas
+      une mesure. Elle est modifiable dans l’analyse financière.</p>` : ''}
+    ${s === 'absente' ? `<p class="dv-avert">Cette donnée n’est pas disponible et
+      n’a pas été remplacée par une valeur inventée.</p>` : ''}
+  </div>`;
+}
+
+/** Le panneau qui rassemble le détail de tous les chiffres suivis. */
+export function panneauProvenance(fusion, noms = {}) {
+  const entrees = Object.entries(fusion?.valeurs ?? {});
+  if (!entrees.length) return '';
+  return `<details class="prov" id="panneauProvenance">
+    <summary><span class="tr-titre">D’où vient chaque valeur</span>
+      <span class="tr-note">${entrees.length} valeurs suivies</span></summary>
+    <div class="prov-liste">
+      ${entrees.map(([cle, v]) => detailValeur(noms[cle] ?? cle, v)).join('')}
+    </div>
+  </details>`;
+}

@@ -83,8 +83,18 @@ export function localiser({ geo = globalThis.navigator?.geolocation, delai = 800
       (pos) => {
         const { latitude, longitude } = pos?.coords ?? {};
         const trouve = gouvernoratLePlusProche(latitude, longitude);
+        // LES COORDONNÉES ÉTAIENT JETÉES. On ne gardait que le gouvernorat
+        // le plus proche — suffisant pour notre référentiel, inutilisable
+        // pour interroger un service de rayonnement, qui travaille au point
+        // et non à la région. Elles remontent maintenant avec leur précision
+        // annoncée par le capteur.
         resoudre(trouve
-          ? { ok: true, ...trouve }
+          ? { ok: true,
+            ...trouve,
+            latitude,
+            longitude,
+            precision: Number.isFinite(pos?.coords?.accuracy) ? pos.coords.accuracy : null,
+            origine: 'capteur' }
           : { ok: false, raison: 'horsTunisie' });
       },
       (err) => resoudre({

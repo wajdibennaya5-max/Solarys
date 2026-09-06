@@ -39,7 +39,7 @@ export const DOMAINE = [
 
 /** APPLICATION : orchestre le domaine. Ne dessine rien. */
 const APPLICATION = ['moteur.js', 'diagnostics.js', 'optimiseur.js', 'copilote.js',
-  'laboratoire.js', 'heros.js', 'etat.js'];
+  'laboratoire.js', 'heros.js', 'etat.js', 'fusion.js'];
 
 /** PRÉSENTATION : met en forme. Ne décide de rien. */
 const PRESENTATION = ['tableau.js', 'graphe.js', 'rapport.js', 'marque.js', 'anime.js'];
