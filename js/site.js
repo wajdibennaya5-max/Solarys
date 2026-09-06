@@ -18,6 +18,10 @@ import { creerCarte } from './vues/carte.js';
 import { creerScene3d } from './vues/scene.js';
 import { construireScene } from './scene3d.js';
 import { implanter, eleverModules } from './implantation.js';
+import { TYPES_OBSTACLE, typeObstacle, ombrageInstantane, friseJournee,
+  resumeJournee, reserve as reserveOmbrage } from './ombrage.js';
+import { DATES as DATES_SOLEIL, dateRepere, position as positionSoleil,
+  journee as journeeSoleil } from './soleil.js';
 import { projeter as projeterSommets } from './toiture.js';
 import { planCalepinage } from './calepinage.js';
 import { ORIENTATIONS, PENTES, expliquerOrientation } from './orientation.js';
@@ -492,6 +496,81 @@ const ETAPES = [
           <button type="button" class="btn fantome" id="retirerModules">Retirer</button>
         </div>
         <div id="compteursModules"></div>
+
+        <details class="repli" id="ombragePan">
+          <summary>Obstacles et ombrage
+            <span class="repli-etat" id="ombrageEtat">non relevés</span></summary>
+
+          <p class="indice">Relevez ce qui dépasse du toit et ce qui l’entoure.
+            L’ombre est ensuite projetée depuis la position réelle du soleil, à la
+            date et à l’heure choisies. C’est une simulation géométrique sur VOS
+            cotes, pas une mesure.</p>
+
+          <div class="duo">
+            <div class="champ">
+              <label for="obsType">Type d’obstacle</label>
+              <select id="obsType" name="obsType">
+                ${TYPES_OBSTACLE.map((t) => `<option value="${t.id}">${t.nom}</option>`)
+    .join('')}
+              </select>
+            </div>
+            <div class="champ">
+              <label for="obsHauteur">Hauteur au-dessus du toit (m)</label>
+              <input id="obsHauteur" type="number" inputmode="decimal" min="0.1"
+                max="30" step="0.1" value="1.2">
+            </div>
+          </div>
+          <p class="indice" id="obsAide"></p>
+          <div class="duo">
+            <div class="champ">
+              <label for="obsLargeur">Largeur (m)</label>
+              <input id="obsLargeur" type="number" inputmode="decimal" min="0.1"
+                max="40" step="0.1" value="0.6">
+            </div>
+            <div class="champ">
+              <label for="obsLongueur">Profondeur (m)</label>
+              <input id="obsLongueur" type="number" inputmode="decimal" min="0.1"
+                max="40" step="0.1" value="0.6">
+            </div>
+          </div>
+          <p class="indice">Placez-le ensuite en appuyant sur la carte du toit,
+            ou saisissez sa position par rapport au centre du bâtiment.</p>
+          <div class="duo">
+            <div class="champ">
+              <label for="obsX">Décalage vers l’est (m)</label>
+              <input id="obsX" type="number" inputmode="decimal" min="-100" max="100"
+                step="0.5" value="0">
+            </div>
+            <div class="champ">
+              <label for="obsY">Décalage vers le nord (m)</label>
+              <input id="obsY" type="number" inputmode="decimal" min="-100" max="100"
+                step="0.5" value="0">
+            </div>
+          </div>
+          <div class="outils">
+            <button type="button" class="btn or" id="obsAjouter">Ajouter l’obstacle</button>
+            <button type="button" class="btn fantome" id="obsVider">Tout retirer</button>
+          </div>
+          <div id="obsListe"></div>
+
+          <div class="frise-tete">
+            <div class="champ">
+              <label for="obsDate">Date de l’étude</label>
+              <select id="obsDate" name="obsDate">
+                ${DATES_SOLEIL.map((d) => `<option value="${d.id}"${
+    d.id === 'hiver' ? ' selected' : ''}>${d.nom}</option>`).join('')}
+              </select>
+            </div>
+            <div class="champ">
+              <label for="obsHeure">Heure — <span id="obsHeureTxt">12 h 00</span></label>
+              <input id="obsHeure" type="range" min="5" max="20" step="0.25" value="12">
+            </div>
+          </div>
+          <p class="indice" id="obsSoleil" role="status" aria-live="polite"></p>
+          <div id="obsFrise"></div>
+          <div id="obsBilan"></div>
+        </details>
+
         <div id="arbreScene"></div>
       </details>
 
@@ -1209,6 +1288,7 @@ function majTrace() {
   // Le volume suit le tracé : le laisser en arrière montrerait un bâtiment
   // qui ne correspond plus aux mètres carrés affichés au-dessus.
   majVue3d();
+  retenirEtatToit();
 
   const zone = $('traceMesures');
   if (!zone) return;
@@ -1279,7 +1359,9 @@ function appliquerTrace() {
       capacite: planImplantation?.nombre
         ? { modules: planImplantation.nombre, kwc: planImplantation.puissance,
           pose: planImplantation.orientation, rive: planImplantation.rive }
-        : null } };
+        : null,
+      obstacles,
+      modulesPoses } };
   majOrientation();
   memoriser();
 
@@ -1367,13 +1449,308 @@ function sceneCourante() {
     })
     : null;
 
-  if (planImplantation?.modules?.length) {
-    // Les modules entrent dans la scène comme des faces à part entière : ils
-    // se trient avec le reste, s'éclairent comme le reste, et s'éteignent
-    // avec leur propre bouton.
-    scene.faces.push(...eleverModules(planImplantation, scene.toit));
-  }
+  const facesModules = planImplantation?.modules?.length
+    ? eleverModules(planImplantation, scene.toit) : [];
+
+  // Les obstacles et leurs ombres entrent dans la scène après les modules :
+  // c'est en les calculant qu'on apprend quels modules sont touchés.
+  const facesObstacles = facesOmbrage(scene);
+  const touches = new Set(dernierOmbrage?.indices ?? []);
+  for (const f of facesModules) f.ombre = touches.has(f.index);
+
+  // Les modules entrent comme des faces à part entière : ils se trient avec le
+  // reste, s'éclairent comme le reste, et s'éteignent avec leur propre bouton.
+  scene.faces.push(...facesModules, ...facesObstacles);
   return scene;
+}
+
+/* ------------------------------------------------------------------ */
+/* MODULE 4 — OBSTACLES ET OMBRAGE                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Les obstacles relevés par l'utilisateur. Rien n'est jamais supposé : un toit
+ * sans obstacle relevé est un toit dont on ne sait rien, pas un toit dégagé.
+ */
+let obstacles = [];
+let dernierOmbrage = null;
+
+/** La date et l'heure de l'étude d'ombrage. */
+const instantOmbrage = () => ({
+  date: dateRepere($('obsDate')?.value ?? 'hiver'),
+  heure: Number($('obsHeure')?.value) || 12,
+});
+
+/**
+ * La cote du rampant en tout point — l'équation du plan du toit.
+ *
+ * C'est la même surface que celle que la scène dessine : la recalculer
+ * autrement ferait tomber les ombres à côté des modules qu'elles touchent.
+ */
+function coteDuRampant(scene) {
+  const t = scene?.toit;
+  if (!t?.sommets || t.sommets.length < 3) return () => 0;
+  const [a, b, c] = t.sommets;
+  const u = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z };
+  const v = { x: c.x - a.x, y: c.y - a.y, z: c.z - a.z };
+  const n = { x: u.y * v.z - u.z * v.y, y: u.z * v.x - u.x * v.z, z: u.x * v.y - u.y * v.x };
+  if (Math.abs(n.z) < 1e-9) return () => a.z;
+  return (p) => a.z - (n.x * (p.x - a.x) + n.y * (p.y - a.y)) / n.z;
+}
+
+/**
+ * Range l'état de travail de la toiture dans les réponses, puis l'enregistre.
+ *
+ * Le tracé, les obstacles et l'implantation ne vivent pas dans le formulaire :
+ * ce sont des variables du module. Appeler `memoriser()` sans passer par ici
+ * enregistrerait donc les quatre champs visibles et rien d'autre — et un
+ * relevé d'obstacles fait sur le toit, échelle à la main, disparaîtrait au
+ * rechargement sans le moindre message.
+ */
+function retenirEtatToit() {
+  reponses.toit = {
+    ...(reponses.toit ?? {}),
+    pente: $('pente')?.value ?? reponses.toit?.pente ?? 'moyenne',
+    orientation: $('orientation')?.value ?? reponses.toit?.orientation ?? 'sud',
+    trace: {
+      ...(reponses.toit?.trace ?? {}),
+      sommets: sommetsToit,
+      facteur: facteurEchelle,
+      etalonne: echelleEtalonnee,
+      obstacles,
+      modulesPoses,
+      hauteurMur: hauteurMurSaisie(),
+      dateOmbrage: $('obsDate')?.value ?? 'hiver',
+    },
+  };
+  memoriser();
+}
+
+/** Les obstacles dessinés en volume, et les ombres qu'ils portent. */
+function facesOmbrage(scene) {
+  if (!scene || !obstacles.length) { dernierOmbrage = null; return []; }
+  const cote = coteDuRampant(scene);
+  const p = position();
+  const { date, heure } = instantOmbrage();
+  const soleil = positionSoleil({
+    latitude: p.latitude ?? 36.8065, longitude: p.longitude ?? 10.1815, date, heure,
+  });
+
+  dernierOmbrage = ombrageInstantane({
+    plan: planImplantation, obstacles, soleil, hauteurDuToit: cote,
+    // Le contour du pan découpe les ombres : sans lui, celle d'une cheminée
+    // proche du bord se prolonge dans le vide à côté du bâtiment.
+    contourToit: scene.toit?.sommets ?? null,
+  });
+
+  const faces = [];
+  // L'obstacle lui-même : une boîte posée sur le rampant.
+  for (const o of dernierOmbrage.obstacles ?? []) {
+    const dl = o.largeur / 2;
+    const dp = o.longueur / 2;
+    const coins = [
+      { x: o.x - dl, y: o.y - dp }, { x: o.x + dl, y: o.y - dp },
+      { x: o.x + dl, y: o.y + dp }, { x: o.x - dl, y: o.y + dp },
+    ];
+    faces.push({
+      role: 'mur',
+      nom: o.nom,
+      sommets: coins.map((q) => ({ ...q, z: cote(q) + o.hauteur })),
+      normale: { x: 0, y: 0, z: 1 },
+    });
+    for (let i = 0; i < 4; i++) {
+      const q = coins[i];
+      const r = coins[(i + 1) % 4];
+      faces.push({
+        role: 'mur',
+        nom: `${o.nom} — face ${i + 1}`,
+        sommets: [
+          { ...q, z: cote(q) }, { ...r, z: cote(r) },
+          { ...r, z: cote(r) + o.hauteur }, { ...q, z: cote(q) + o.hauteur },
+        ],
+        normale: { x: r.y - q.y, y: q.x - r.x, z: 0 },
+      });
+    }
+  }
+
+  // Les ombres, posées un centimètre au-dessus du rampant.
+  for (const contour of dernierOmbrage.ombres ?? []) {
+    faces.push({
+      role: 'ombre',
+      nom: 'Ombre portée',
+      sommets: contour.map((q) => ({ ...q, z: cote(q) + 0.01 })),
+      normale: { x: 0, y: 0, z: 1 },
+    });
+  }
+  return faces;
+}
+
+/** La liste des obstacles relevés, avec de quoi les retirer un à un. */
+function listeObstacles() {
+  if (!obstacles.length) {
+    return `<p class="indice indice-absent">Aucun obstacle relevé. Ce n’est pas la
+      preuve qu’il n’y en a pas : c’est l’absence de relevé.</p>`;
+  }
+  return `<ul class="obstacles">${obstacles.map((o, i) => `<li>
+    <b>${echapper(o.nom ?? typeObstacle(o.type).nom)}</b>
+    <span>${Number(o.hauteur).toFixed(2)} m de haut ·
+      ${Number(o.largeur).toFixed(2)} × ${Number(o.longueur).toFixed(2)} m ·
+      ${Number(o.x).toFixed(1)} m E / ${Number(o.y).toFixed(1)} m N</span>
+    <button type="button" class="btn fantome menu" data-retirer="${i}"
+      aria-label="Retirer ${echapper(o.nom ?? '')}">Retirer</button>
+  </li>`).join('')}</ul>`;
+}
+
+/** La frise de la journée : une barre par demi-heure. */
+function friseOmbrage(scene) {
+  if (!scene || !obstacles.length || !planImplantation?.nombre) return '';
+  const p = position();
+  const { date } = instantOmbrage();
+  const frise = friseJournee({
+    plan: planImplantation, obstacles,
+    latitude: p.latitude ?? 36.8065, longitude: p.longitude ?? 10.1815,
+    date, hauteurDuToit: coteDuRampant(scene),
+    contourToit: scene.toit?.sommets ?? null,
+  });
+  const bilan = resumeJournee(frise);
+  const heureCourante = instantOmbrage().heure;
+  const total = planImplantation.nombre;
+
+  const barres = frise.map((h) => {
+    const part = total ? h.touches / total : 0;
+    const actuelle = Math.abs(h.heure - heureCourante) < 0.26;
+    return `<div class="frise-barre${actuelle ? ' ici' : ''}"
+      style="--part:${(part * 100).toFixed(1)}%"
+      title="${h.heure.toFixed(2).replace('.', 'h')} — ${h.touches} module${
+  h.touches > 1 ? 's' : ''} touché${h.touches > 1 ? 's' : ''}, soleil à ${
+  Math.round(h.hauteur)}°"></div>`;
+  }).join('');
+
+  const heures = frise.length ? [frise[0].heure, frise[frise.length - 1].heure] : [0, 0];
+  return `<div class="frise" role="img"
+    aria-label="Modules touchés par l’ombre au fil de la journée">
+    ${barres}
+  </div>
+  <div class="frise-axe"><span>${heures[0].toFixed(0)} h</span>
+    <span>midi</span><span>${heures[1].toFixed(0)} h</span></div>
+  ${bilanOmbrage(bilan, total)}`;
+}
+
+/** Le bilan de la journée — jamais un chiffre nu. */
+function bilanOmbrage(bilan, total) {
+  if (bilan.jamaisTouche) {
+    return `<p class="pos-phrase applique">Aux heures qui produisent vraiment,
+      aucun module n’est touché par les obstacles relevés.</p>`;
+  }
+  const compteur = (v, l) => `<div class="compteur"><b>${v}</b><span>${l}</span></div>`;
+  return `<div class="compteurs">
+    ${compteur(`${bilan.pire.touches} / ${total}`, `au pire moment (${
+  bilan.pire.heure.toFixed(2).replace('.', ' h ')})`)}
+    ${compteur(`${Math.round(bilan.moyenne * 100)} %`, 'des modules touchés en moyenne')}
+    ${compteur(`${Math.round(bilan.pire.hauteur)}°`, 'hauteur du soleil au pire moment')}
+  </div>
+  <p class="indice">La moyenne ne porte que sur les heures où le soleil dépasse
+    10° : plus bas, la production est marginale et l’y compter gonflerait le
+    chiffre. Un module touché n’est pas un module éteint — il produit encore,
+    moins. Convertir cela en kilowattheures perdus demanderait un modèle
+    électrique que cette étude n’a pas.</p>`;
+}
+
+/** Met à jour tout le volet ombrage. */
+function majOmbrage(scene) {
+  const liste = $('obsListe');
+  if (liste) liste.innerHTML = listeObstacles();
+
+  const etat = $('ombrageEtat');
+  if (etat) {
+    etat.textContent = obstacles.length
+      ? `${obstacles.length} relevé${obstacles.length > 1 ? 's' : ''}` : 'non relevés';
+    etat.className = `repli-etat repli-${obstacles.length ? 'bonne' : 'vide'}`;
+  }
+
+  const { date, heure } = instantOmbrage();
+  const txt = $('obsHeureTxt');
+  if (txt) {
+    const h = Math.floor(heure);
+    txt.textContent = `${h} h ${String(Math.round((heure - h) * 60)).padStart(2, '0')}`;
+  }
+
+  const p = position();
+  const soleil = positionSoleil({
+    latitude: p.latitude ?? 36.8065, longitude: p.longitude ?? 10.1815, date, heure,
+  });
+  const j = journeeSoleil({
+    latitude: p.latitude ?? 36.8065, longitude: p.longitude ?? 10.1815, date,
+  });
+  const mot = $('obsSoleil');
+  if (mot && soleil) {
+    const cap = soleil.azimut < -10 ? 'à l’est' : soleil.azimut > 10 ? 'à l’ouest' : 'au sud';
+    mot.textContent = soleil.hauteur <= 0
+      ? `À cette heure le soleil est couché (lever ${(j.lever ?? 0).toFixed(2)
+        .replace('.', ' h ')}, coucher ${(j.coucher ?? 0).toFixed(2).replace('.', ' h ')}).`
+      : `Soleil à ${soleil.hauteur.toFixed(1)}° de hauteur, ${cap} `
+        + `(azimut ${Math.round(soleil.azimut)}°, 0 = plein sud).`;
+    mot.className = `indice${soleil.leve ? '' : ' indice-absent'}`;
+  }
+
+  const zoneFrise = $('obsFrise');
+  if (zoneFrise) zoneFrise.innerHTML = friseOmbrage(scene);
+
+  const zoneBilan = $('obsBilan');
+  if (zoneBilan) {
+    zoneBilan.innerHTML = dernierOmbrage && !dernierOmbrage.raison
+      ? `<p class="pos-phrase reserve">${echapper(reserveOmbrage({ obstacles,
+        etalonne: echelleEtalonnee }))}</p>`
+      : `<p class="indice">${echapper(dernierOmbrage?.raison
+        ?? reserveOmbrage({ obstacles }))}</p>`;
+  }
+}
+
+/** Branche le volet des obstacles. */
+function brancherOmbrage() {
+  const majAide = () => {
+    const t = typeObstacle($('obsType')?.value);
+    const aide = $('obsAide');
+    if (aide) aide.textContent = t.aide;
+    // Les cotes du type servent de point de départ, pas de vérité : elles
+    // restent modifiables, et le relevé sur place prime toujours.
+    for (const [id, v] of [['obsHauteur', t.hauteur], ['obsLargeur', t.largeur],
+      ['obsLongueur', t.longueur]]) {
+      const champ = $(id);
+      if (champ) champ.value = v;
+    }
+  };
+  $('obsType')?.addEventListener('change', majAide);
+  majAide();
+
+  $('obsAjouter')?.addEventListener('click', () => {
+    obstacles = [...obstacles, {
+      type: $('obsType')?.value ?? 'autre',
+      hauteur: Number($('obsHauteur')?.value),
+      largeur: Number($('obsLargeur')?.value),
+      longueur: Number($('obsLongueur')?.value),
+      x: Number($('obsX')?.value) || 0,
+      y: Number($('obsY')?.value) || 0,
+    }];
+    majVue3d();
+    retenirEtatToit();
+  });
+  $('obsVider')?.addEventListener('click', () => {
+    obstacles = [];
+    majVue3d();
+    retenirEtatToit();
+  });
+  $('obsListe')?.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-retirer]');
+    if (!b) return;
+    obstacles = obstacles.filter((_, i) => i !== Number(b.dataset.retirer));
+    majVue3d();
+    retenirEtatToit();
+  });
+  $('obsDate')?.addEventListener('change', () => { majVue3d(); retenirEtatToit(); });
+  for (const evenement of ['input', 'change']) {
+    $('obsHeure')?.addEventListener(evenement, majVue3d);
+  }
 }
 
 /** Le retrait de rive saisi, borné à ce qu'un couvreur accepterait. */
@@ -1428,7 +1805,10 @@ function arbreScene(scene, m) {
     'hauteur saisie')}
     ${branche('Toiture', `1 pan, ${Math.round(scene.toit.pente)}° de pente, `
       + `${m.surfaceRampant.toFixed(1)} m² de rampant`, 'contour tracé sur la carte')}
-    ${branche('Obstacles', 'aucun', 'pas encore relevés')}
+    ${branche('Obstacles', obstacles.length
+    ? `${obstacles.length} relevé${obstacles.length > 1 ? 's' : ''}${
+      dernierOmbrage?.touches ? `, ${dernierOmbrage.touches} module(s) touché(s)` : ''}`
+    : 'aucun', obstacles.length ? 'cotes saisies sur place' : 'pas encore relevés')}
     ${branche('Générateur', planImplantation?.nombre
     ? `${planImplantation.nombre} modules, ${planImplantation.puissance.toFixed(2)} kWc`
     : 'aucun module posé', planImplantation?.nombre
@@ -1453,6 +1833,7 @@ function majVue3d() {
   if (arbre) arbre.innerHTML = scene ? arbreScene(scene, mesuresToit()) : '';
   const compteurs = $('compteursModules');
   if (compteurs) compteurs.innerHTML = scene ? compteursImplantation(planImplantation) : '';
+  majOmbrage(scene);
   const poser = $('poserModules');
   if (poser) {
     poser.disabled = !scene;
@@ -1478,11 +1859,14 @@ function brancherVue3d() {
   for (const evenement of ['input', 'change']) {
     $('riveToit')?.addEventListener(evenement, majVue3d);
   }
-  $('poserModules')?.addEventListener('click', () => { modulesPoses = true; majVue3d(); });
+  $('poserModules')?.addEventListener('click', () => {
+    modulesPoses = true; majVue3d(); retenirEtatToit();
+  });
   $('retirerModules')?.addEventListener('click', () => {
     modulesPoses = false;
     planImplantation = null;
     majVue3d();
+    retenirEtatToit();
   });
   majVue3d();
 }
@@ -1503,7 +1887,6 @@ function brancherEtalonnage() {
       etat.className = 'repli-etat repli-bonne';
     }
     majTrace();
-    memoriser();
   });
   $('etalonAnnuler')?.addEventListener('click', () => {
     facteurEchelle = 1;
@@ -1512,7 +1895,6 @@ function brancherEtalonnage() {
     const etat = $('etalonEtat');
     if (etat) { etat.textContent = 'non étalonné'; etat.className = 'repli-etat repli-vide'; }
     majTrace();
-    memoriser();
   });
 }
 
@@ -1530,7 +1912,16 @@ function brancherTracage() {
     sommetsToit = memoire.sommets;
     facteurEchelle = Number(memoire.facteur) || 1;
     echelleEtalonnee = Boolean(memoire.etalonne);
+    // Un relevé d'obstacles se fait sur le toit, échelle à la main : le perdre
+    // au changement d'étape ferait remonter le client sur son toit.
+    if (Array.isArray(memoire.obstacles)) obstacles = memoire.obstacles;
+    if (memoire.modulesPoses) modulesPoses = true;
   }
+
+  const hm = $('hauteurMur');
+  if (hm && Number.isFinite(Number(memoire?.hauteurMur))) hm.value = memoire.hauteurMur;
+  const jour = $('obsDate');
+  if (jour && memoire?.dateOmbrage) jour.value = memoire.dateOmbrage;
 
   const p = position();
   carteToit = creerCarte(boite, {
@@ -1561,6 +1952,7 @@ function brancherTracage() {
   $('orientation')?.addEventListener('change', majVue3d);
   brancherEtalonnage();
   brancherVue3d();
+  brancherOmbrage();
   majTrace();
 }
 

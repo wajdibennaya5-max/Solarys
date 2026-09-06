@@ -31,7 +31,7 @@ export const DOMAINE = [
   'etude.js', 'scenarios.js', 'tarif.js', 'profil.js', 'consommation.js',
   'batiment.js', 'co2.js', 'score.js', 'technique.js', 'validation.js',
   'calepinage.js', 'gisement.js', 'orientation.js', 'facture.js', 'materiel.js',
-  'finances.js', 'prix.js', 'provenance.js', 'localisation.js', 'toiture.js', 'scene3d.js', 'implantation.js',
+  'finances.js', 'prix.js', 'provenance.js', 'localisation.js', 'toiture.js', 'scene3d.js', 'implantation.js', 'soleil.js', 'ombrage.js',
   // La géométrie d'une carte est du calcul : une projection, des tuiles, une
   // échelle. Elle ne visite aucune adresse, elle en compose.
   'carte/tuiles.js', 'carte/fonds.js',

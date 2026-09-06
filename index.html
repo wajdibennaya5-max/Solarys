@@ -1209,6 +1209,28 @@ footer .bas{margin-top:36px;padding-top:20px;border-top:1px solid rgba(255,255,2
 .compteur b{display:block;font-size:17px;font-weight:800;color:var(--nuit);line-height:1.15}
 .compteur span{display:block;margin-top:2px;font-size:11.5px;color:var(--encre-3);
   line-height:1.3}
+
+/* ---- Obstacles et ombrage ---- */
+.obstacles{list-style:none;margin:10px 0;padding:0;border:1px solid var(--bord);
+  border-radius:10px;overflow:hidden;background:var(--surface)}
+.obstacles li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;
+  padding:9px 12px;font-size:13px;border-bottom:1px solid var(--bord)}
+.obstacles li:last-child{border-bottom:none}
+.obstacles li b{min-width:120px;color:var(--nuit)}
+.obstacles li span{flex:1 1 160px;color:var(--encre-3);font-size:12px}
+.obstacles .menu{flex:0 0 auto;min-height:34px;padding:6px 12px;font-size:12px}
+
+.frise-tete{display:grid;grid-template-columns:1fr;gap:10px;margin-top:16px}
+@media (min-width:520px){.frise-tete{grid-template-columns:170px 1fr;align-items:end}}
+.frise-tete input[type="range"]{width:100%;min-height:34px;accent-color:var(--or)}
+.frise{display:flex;align-items:flex-end;gap:1px;height:88px;margin:12px 0 4px;
+  padding:6px;border-radius:10px;background:var(--surface);border:1px solid var(--bord)}
+.frise-barre{flex:1 1 auto;min-width:2px;height:100%;border-radius:2px 2px 0 0;
+  background:linear-gradient(to top,#8a3030 0,#8a3030 var(--part),
+    rgba(120,132,150,.16) var(--part),rgba(120,132,150,.16) 100%)}
+.frise-barre.ici{outline:2px solid var(--or);outline-offset:1px;border-radius:3px}
+.frise-axe{display:flex;justify-content:space-between;font-size:11px;
+  color:var(--encre-3);margin:0 6px 8px}
 </style>
 </head>
 <body>

@@ -29,6 +29,10 @@ const TEINTES = {
   // Un bleu très sombre : c'est la couleur d'un module réel, et surtout elle
   // ne se confond avec aucune autre face de la scène.
   module: [30, 42, 66],
+  // L'ombre est une couche à part, posée sur le rampant : la peindre en
+  // assombrissant le toit reviendrait à retoucher une face qui, elle, est
+  // calculée.
+  ombre: [46, 52, 60],
 };
 
 const el = (nom, classe, dedans) => {
@@ -64,7 +68,8 @@ export function creerScene3d(racine, { scene = null, surVue = null } = {}) {
   let hauteur = 0;
 
   /** Ce que l'on montre. Chaque couche s'éteint séparément. */
-  const couches = { terrain: true, mur: true, toit: true, module: true, cotes: true };
+  const couches = { terrain: true, mur: true, toit: true, module: true,
+    ombre: true, cotes: true };
 
   racine.classList.add('scene3d');
   racine.setAttribute('role', 'application');
@@ -96,7 +101,7 @@ export function creerScene3d(racine, { scene = null, surVue = null } = {}) {
 
   const bascules = el('div', 'scene3d-couches');
   const NOMS = { terrain: 'Terrain', mur: 'Murs', toit: 'Toiture',
-    module: 'Modules', cotes: 'Cotes' };
+    module: 'Modules', ombre: 'Ombres', cotes: 'Cotes' };
   const boutonsCouche = {};
   for (const [cle, nom] of Object.entries(NOMS)) {
     const b = el('button', 'scene3d-couche actif', nom);
@@ -152,12 +157,28 @@ export function creerScene3d(racine, { scene = null, surVue = null } = {}) {
       contexte.beginPath();
       f.points.forEach((p, i) => (i ? contexte.lineTo(p.x, p.y) : contexte.moveTo(p.x, p.y)));
       contexte.closePath();
-      contexte.fillStyle = `rgb(${base.map((c) => Math.round(c * k)).join(',')})`;
+      if (f.role === 'ombre') {
+        // Semi-transparente : on doit continuer de voir ce qu'elle recouvre,
+        // sinon on ne sait plus quels modules sont dessous.
+        contexte.fillStyle = `rgba(${base.join(',')},.5)`;
+      } else if (f.ombre) {
+        // Un module touché vire au rouge sourd : reconnaissable d'un coup
+        // d'œil, sans que la scène devienne un sapin de Noël.
+        contexte.fillStyle = `rgb(${[132, 48, 48].map((c) => Math.round(c * k)).join(',')})`;
+      } else {
+        contexte.fillStyle = `rgb(${base.map((c) => Math.round(c * k)).join(',')})`;
+      }
       contexte.fill();
       // Les arêtes : sans elles, deux faces de teinte voisine se confondent et
       // le volume disparaît.
       // Les modules se dessinent au trait clair : sur un fond presque noir,
       // une arête sombre disparaît et le champ devient une tache.
+      if (f.role === 'ombre') {
+        contexte.strokeStyle = 'rgba(20,24,30,.55)';
+        contexte.lineWidth = 1;
+        contexte.stroke();
+        continue;
+      }
       contexte.strokeStyle = f.role === 'module'
         ? 'rgba(255,255,255,.45)' : 'rgba(28,32,38,.45)';
       contexte.lineWidth = f.role === 'toit' ? 1.6 : 1;
