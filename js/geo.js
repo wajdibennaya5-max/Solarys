@@ -72,37 +72,78 @@ export const REFUS = {
 /**
  * Demande la position au navigateur et en déduit le gouvernorat.
  *
+ * CE QUI A CHANGÉ, ET POURQUOI. On ne retenait que la latitude, la longitude
+ * et la précision. Il manquait tout ce qui permet de juger la mesure :
+ * l'altitude — qui change la production de plusieurs pour cent en montagne —,
+ * l'heure du relevé — une position d'il y a deux heures n'est pas celle d'un
+ * client qui a changé de chantier —, et le fait de savoir si le terminal a
+ * réellement sollicité son GPS ou s'est contenté du réseau.
+ *
+ * `haute` demande le GPS. C'est plus lent et plus coûteux en batterie ; on ne
+ * le fait donc que lorsque l'utilisateur le demande explicitement, pas au
+ * chargement de la page.
+ *
  * @param {object} [opts]
  * @param {object} [opts.geo] injecté par les tests
- * @returns {Promise<{ok:true, id:string, km:number}|{ok:false, raison:keyof REFUS}>}
+ * @param {boolean} [opts.haute] solliciter le GPS plutôt que le réseau
+ * @returns {Promise<{ok:true, id:string, km:number, latitude:number,
+ *   longitude:number, precision:number|null, altitude:number|null,
+ *   horodatage:number, origine:string}|{ok:false, raison:keyof REFUS}>}
  */
-export function localiser({ geo = globalThis.navigator?.geolocation, delai = 8000 } = {}) {
+export function localiser({
+  geo = globalThis.navigator?.geolocation,
+  delai = 8000,
+  haute = false,
+} = {}) {
   return new Promise((resoudre) => {
     if (!geo?.getCurrentPosition) return resoudre({ ok: false, raison: 'indisponible' });
     geo.getCurrentPosition(
       (pos) => {
-        const { latitude, longitude } = pos?.coords ?? {};
+        const c = pos?.coords ?? {};
+        const { latitude, longitude } = c;
         const trouve = gouvernoratLePlusProche(latitude, longitude);
-        // LES COORDONNÉES ÉTAIENT JETÉES. On ne gardait que le gouvernorat
-        // le plus proche — suffisant pour notre référentiel, inutilisable
-        // pour interroger un service de rayonnement, qui travaille au point
-        // et non à la région. Elles remontent maintenant avec leur précision
-        // annoncée par le capteur.
-        resoudre(trouve
-          ? { ok: true,
-            ...trouve,
-            latitude,
-            longitude,
-            precision: Number.isFinite(pos?.coords?.accuracy) ? pos.coords.accuracy : null,
-            origine: 'capteur' }
-          : { ok: false, raison: 'horsTunisie' });
+        if (!trouve) return resoudre({ ok: false, raison: 'horsTunisie' });
+
+        // Un nombre, ou rien. `Number(null)` vaut zéro : une altitude absente
+        // deviendrait « au niveau de la mer », et une précision absente
+        // deviendrait « zéro mètre », c'est-à-dire parfaite. Deux mensonges
+        // pour une seule étourderie.
+        const nb = (v) => {
+          if (v === null || v === undefined || typeof v === 'boolean') return null;
+          const n = Number(v);
+          return Number.isFinite(n) ? n : null;
+        };
+
+        const precision = nb(c.accuracy);
+        resoudre({
+          ok: true,
+          ...trouve,
+          latitude,
+          longitude,
+          precision,
+          altitude: nb(c.altitude),
+          precisionAltitude: nb(c.altitudeAccuracy),
+          horodatage: nb(pos?.timestamp) ?? Date.now(),
+          // On ne prétend pas savoir quel capteur a répondu : le navigateur ne
+          // le dit pas. En revanche, une précision de quelques mètres ne
+          // s'obtient que par satellite — c'est une déduction, pas une
+          // déclaration, et le libellé reste prudent.
+          origine: haute && precision !== null && precision <= 20 ? 'capteur-fin' : 'capteur',
+        });
       },
       (err) => resoudre({
         ok: false,
         // 1 = permission refusée ; le reste est un échec technique.
         raison: err?.code === 1 ? 'refuse' : 'echec',
       }),
-      { enableHighAccuracy: false, timeout: delai, maximumAge: 600000 },
+      {
+        enableHighAccuracy: Boolean(haute),
+        timeout: delai,
+        // Une demande de précision ne doit pas être servie par un relevé
+        // vieux de dix minutes : ce serait la même position, présentée comme
+        // meilleure.
+        maximumAge: haute ? 0 : 600000,
+      },
     );
   });
 }

@@ -125,20 +125,71 @@ export function position() {
       longitude: p.longitude,
       precisionPosition: Number.isFinite(p.precision) ? p.precision : null,
       originePosition: p.origine ?? 'capteur',
+      // L'altitude change le rayonnement de plusieurs pour cent en altitude,
+      // et l'heure du relevé dit si cette position est encore celle du
+      // chantier. Les jeter revenait à ne plus pouvoir les afficher.
+      altitude: Number.isFinite(p.altitude) ? p.altitude : null,
+      horodatagePosition: Number.isFinite(p.horodatage) ? p.horodatage : null,
     };
   }
+  // DÉFAUT CORRIGÉ : `CENTRES` range ses points en tableaux `[lat, lon]`,
+  // et ce code lisait `centre.lat`. Il rendait donc `undefined` à chaque
+  // fois : le repli sur le centre du gouvernorat n'a jamais fonctionné, et
+  // le service de rayonnement était interrogé sans coordonnées — donc pas
+  // interrogé du tout, silencieusement.
   const centre = CENTRES[reponses.gouvernorat];
-  if (centre) {
+  if (Array.isArray(centre)) {
     return {
-      latitude: centre.lat,
-      longitude: centre.lon,
-      precisionPosition: null,
+      latitude: centre[0],
+      longitude: centre[1],
+      // Un centre de gouvernorat est à des dizaines de kilomètres de la
+      // toiture. On l'annonce en mètres pour que la précision affichée ne
+      // soit jamais flatteuse.
+      precisionPosition: 30000,
       originePosition: 'centre-gouvernorat',
+      altitude: null,
+      horodatagePosition: null,
     };
   }
   return { latitude: null, longitude: null, precisionPosition: null,
-    originePosition: 'inconnue' };
+    originePosition: 'inconnue', altitude: null, horodatagePosition: null };
 }
+
+/**
+ * Retient une position, quelle que soit sa provenance.
+ *
+ * Un seul point d'entrée : le capteur, la saisie manuelle et le repère posé
+ * sur la carte passent tous par ici. C'est ce qui garantit qu'une position
+ * porte toujours son origine — et qu'aucun chemin ne peut en glisser une
+ * sans étiquette.
+ *
+ * @returns {object|null} la position retenue, ou `null` si elle est
+ *   inexploitable — on préfère garder la précédente qu'en écrire une fausse.
+ */
+export function definirPosition(p) {
+  const lat = Number(p?.latitude);
+  const lon = Number(p?.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)
+    || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  const nb = (v) => {
+    if (v === null || v === undefined || v === '' || typeof v === 'boolean') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  reponses.position = {
+    latitude: lat,
+    longitude: lon,
+    precision: nb(p.precision),
+    altitude: nb(p.altitude),
+    precisionAltitude: nb(p.precisionAltitude),
+    horodatage: nb(p.horodatage) ?? Date.now(),
+    origine: p.origine ?? 'saisie',
+  };
+  return reponses.position;
+}
+
+/** Oublie la position retenue — le visiteur repart du gouvernorat seul. */
+export function oublierPosition() { delete reponses.position; }
 
 /** L'étude, avec les réglages courants du tableau de bord. */
 export function etudeCourante() {

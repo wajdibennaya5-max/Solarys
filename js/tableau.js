@@ -13,6 +13,7 @@
 import { formater, formaterRond } from './prix.js';
 import { formater as formaterCo2, enArbres, VERIFIE as CO2_VERIFIE } from './co2.js';
 import { typeBatiment } from './batiment.js';
+import { heureDeMesure } from './localisation.js';
 
 /**
  * Une valeur qui monte à l'écran.
@@ -791,5 +792,58 @@ export function centreDonnees({ configure, etat, mesure, avertissement, attribut
       Ce qui vient du service porte l’étiquette <span class="orig orig-externe">SOURCE</span>,
       ce que nous en déduisons porte <span class="orig orig-calcul">CALCUL</span>.</p>
     ${attribution ? `<p class="cds-attrib">${attribution.mention}</p>` : ''}
+  </div>`;
+}
+
+/**
+ * LA FICHE DE POSITION : ce qu'on sait du point, et comment on le sait.
+ *
+ * Elle n'affiche jamais un couple de coordonnées seul. Une position sans son
+ * origine, sa précision et son heure de relevé se lit comme une certitude —
+ * alors que le centre d'un gouvernorat et un GPS à trois mètres s'écrivent
+ * exactement pareil.
+ *
+ * Ne calcule rien : `localisation.js` a déjà tranché ce que la position
+ * autorise, cette fonction se contente de l'écrire.
+ */
+export function fichePosition(portrait, { gouvernorat = null } = {}) {
+  if (!portrait) return '';
+  if (!portrait.connue) {
+    return `<div class="pos pos-vide">
+      <p class="pos-phrase">${portrait.phrase}</p>
+      <p class="indice">Utilisez la localisation, la carte ou la saisie manuelle
+        ci-dessous. À défaut, le calcul s’appuiera sur le gouvernorat seul.</p>
+    </div>`;
+  }
+
+  const ligne = (nom, valeur, absent = 'non disponible') => `<div class="pos-l">
+    <dt>${nom}</dt>
+    <dd>${valeur !== null && valeur !== undefined && valeur !== ''
+    ? valeur : `<i>${absent}</i>`}</dd>
+  </div>`;
+
+  const heure = heureDeMesure(portrait.horodatage);
+  const precision = portrait.precisionAnnoncee
+    ? `± ${Math.round(portrait.precisionMetres)} m`
+    : null;
+
+  return `<div class="pos pos-${portrait.precision.cle}">
+    <div class="pos-tete">
+      <span class="pos-classe">${portrait.precision.libelle}</span>
+      <span class="pos-origine">${portrait.origine.libelle}</span>
+    </div>
+    <p class="pos-coord"><code>${portrait.texte}</code></p>
+    <p class="pos-dms">${portrait.dms}</p>
+    <dl class="pos-faits">
+      ${ligne('Précision annoncée', precision, 'non annoncée par la source')}
+      ${ligne('Altitude', portrait.altitude !== null
+    ? `${Math.round(portrait.altitude)} m` : null, 'non mesurée')}
+      ${ligne('Relevé le', heure, 'heure inconnue')}
+      ${ligne('Méthode', portrait.origine.methode)}
+      ${gouvernorat ? ligne('Gouvernorat retenu', gouvernorat) : ''}
+    </dl>
+    <p class="pos-phrase">${portrait.phrase}</p>
+    ${portrait.permetToiture ? '' : `<p class="pos-limite">Le tracé d’une toiture
+      reste indisponible tant que la position n’est pas affinée.</p>`}
   </div>`;
 }

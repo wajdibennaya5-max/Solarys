@@ -10,7 +10,7 @@ C'est ce qui rend les 361 tests possibles sans navigateur : on peut vérifier
 une tension de chaîne, un temps de retour ou une part autoconsommée en
 important un module et en l'appelant.
 
-## Les quatre couches
+## Les cinq couches
 
 Elles sont aujourd'hui des **ensembles de fichiers** dans `js/`, et non des
 répertoires. Le découpage physique viendrait ensuite et ne changerait rien aux
@@ -50,14 +50,30 @@ ils divergeraient.
 ### INFRASTRUCTURE — le monde extérieur
 
 `session` (stockage local) · `prospect` (envoi au serveur) · `geo`
-(géolocalisation) · `journal` (observabilité)
+(géolocalisation) · `journal` (observabilité) · `pvgis/client` (réseau) ·
+`pvgis/cache` (stockage)
 
 Seule couche autorisée à parler au stockage, au réseau et au capteur de
 position.
 
+### VUES — un composant, un élément
+
+`vues/carte.js` (carte interactive)
+
+Cette couche est née d'un défaut mesurable : le contrôleur dépassait dix-huit
+cents lignes, et la carte y aurait ajouté le glissement, le zoom, le
+pincement, le chargement des tuiles et le clavier.
+
+Une vue a le droit de toucher au document — **mais seulement à l'élément qu'on
+lui confie**. Elle n'a pas le droit de calculer : la géométrie vient du
+domaine (`carte/tuiles.js`), la question du fournisseur aussi
+(`carte/fonds.js`). Elle ne connaît ni le contrôleur, ni l'état global : deux
+tests le vérifient, ainsi qu'un troisième qui interdit d'écrire une adresse de
+tuile en dur.
+
 ### CONTRÔLEUR — le point d'entrée
 
-`site.js`, et lui seul. Le seul fichier autorisé à interroger le document.
+`site.js`, et lui seul. Le seul fichier autorisé à orchestrer la page entière.
 Il n'exporte rien : personne ne doit pouvoir l'importer, sous peine de cycle.
 
 ## Le flux d'une simulation

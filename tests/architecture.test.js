@@ -31,7 +31,10 @@ export const DOMAINE = [
   'etude.js', 'scenarios.js', 'tarif.js', 'profil.js', 'consommation.js',
   'batiment.js', 'co2.js', 'score.js', 'technique.js', 'validation.js',
   'calepinage.js', 'gisement.js', 'orientation.js', 'facture.js', 'materiel.js',
-  'finances.js', 'prix.js', 'provenance.js',
+  'finances.js', 'prix.js', 'provenance.js', 'localisation.js',
+  // La géométrie d'une carte est du calcul : une projection, des tuiles, une
+  // échelle. Elle ne visite aucune adresse, elle en compose.
+  'carte/tuiles.js', 'carte/fonds.js',
   // La composition des requêtes et la lecture des réponses sont du calcul
   // pur : elles ne parlent à personne, elles transforment des données.
   'pvgis/parametres.js', 'pvgis/reponse.js', 'pvgis/erreurs.js', 'pvgis/config.js',
@@ -50,10 +53,19 @@ const INFRASTRUCTURE = ['session.js', 'prospect.js', 'geo.js', 'journal.js',
   // dans le domaine, précisément pour cette raison.
   'pvgis/client.js', 'pvgis/cache.js'];
 
-/** CONTRÔLEUR : le seul à toucher au document. */
+/**
+ * VUES : un composant, un élément du document, rien d'autre.
+ *
+ * Cette couche est née d'un défaut concret : le contrôleur dépassait dix-huit
+ * cents lignes. Une vue a le droit de toucher au document — mais seulement au
+ * sien — et n'a pas le droit de calculer : elle demande au domaine.
+ */
+const VUES = ['vues/carte.js'];
+
+/** CONTRÔLEUR : le seul à orchestrer la page entière. */
 const CONTROLEUR = ['site.js'];
 
-const CLASSES = { DOMAINE, APPLICATION, PRESENTATION, INFRASTRUCTURE, CONTROLEUR };
+const CLASSES = { DOMAINE, APPLICATION, PRESENTATION, INFRASTRUCTURE, VUES, CONTROLEUR };
 
 test('chaque fichier appartient à exactement une couche', () => {
   // Un fichier non classé est un fichier dont personne ne sait ce qu'il a le
@@ -89,7 +101,8 @@ test('le domaine n’importe jamais la présentation ni l’infrastructure', () 
   // serveur, ni à un test.
   for (const f of DOMAINE) {
     const code = lire(f);
-    for (const interdit of [...PRESENTATION, ...INFRASTRUCTURE, ...APPLICATION, ...CONTROLEUR]) {
+    for (const interdit of [...PRESENTATION, ...INFRASTRUCTURE, ...APPLICATION,
+      ...VUES, ...CONTROLEUR]) {
       // `prix.js` est du formatage pur, `provenance.js` de l'étiquetage :
       // le domaine peut s'en servir.
       if (interdit === 'prix.js' || interdit === 'provenance.js') continue;
@@ -175,5 +188,39 @@ test('les hypothèses de calcul restent groupées, jamais dispersées', () => {
       assert.ok(!new RegExp(`^\\s*${c}\\s*:\\s*[0-9]`, 'm').test(code),
         `${f} redéfinit l’hypothèse ${c}`);
     }
+  }
+});
+
+
+test('une vue ne calcule pas : elle affiche ce que le domaine lui donne', () => {
+  // Le jour où un composant recalcule une échelle « pour aller plus vite »,
+  // deux échelles coexistent et l'une des deux est fausse.
+  const moteurs = ['etude.js', 'finances.js', 'optimiseur.js', 'moteur.js',
+    'scenarios.js', 'laboratoire.js', 'diagnostics.js', 'technique.js'];
+  for (const f of VUES) {
+    const code = lire(f);
+    for (const m of moteurs) {
+      assert.ok(!code.includes(`/${m}'`), `${f} importe ${m} : une vue se met à calculer`);
+    }
+  }
+});
+
+test('une vue ne connaît ni le contrôleur ni le formulaire', () => {
+  // Un composant qui appelle `site.js` n'est plus réutilisable : il est
+  // soudé à une page. C'est la soudure qu'on veut éviter.
+  for (const f of VUES) {
+    const code = lire(f);
+    assert.ok(!/from\s+['"][./]*site\.js['"]/.test(code), `${f} importe le contrôleur`);
+    assert.ok(!/from\s+['"][./]*etat\.js['"]/.test(code), `${f} importe l’état global`);
+  }
+});
+
+test('la carte n’écrit jamais une adresse de tuile en dur', () => {
+  // Coder un fournisseur en dur dans un composant, c'est engager le projet
+  // auprès d'un tiers sans que personne ne l'ait décidé.
+  for (const f of [...VUES, ...CONTROLEUR]) {
+    const code = lire(f);
+    assert.ok(!/https:\/\/[^'"\s]*\{[zxy]\}/.test(code),
+      `${f} contient un modèle de tuile en dur : il doit venir de carte/fonds.js`);
   }
 });

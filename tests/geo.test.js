@@ -102,3 +102,61 @@ test('chaque échec porte un message qui dit quoi faire', () => {
     assert.match(message, /liste/, `${cle} doit renvoyer vers la liste`);
   }
 });
+
+/** Un capteur simulé, pour éprouver ce qu'on retient de sa réponse. */
+const capteur = (coords, timestamp = 1700000000000) => ({
+  getCurrentPosition: (ok, _ko, options) => ok({ coords, timestamp, options }),
+});
+
+test('LA MESURE REMONTE ENTIÈRE : altitude, heure et précision', async () => {
+  // Sans l'altitude, une installation à Aïn Draham est calculée comme au bord
+  // de mer. Sans l'heure, on ne sait pas si la position date d'aujourd'hui.
+  const r = await localiser({ haute: true, geo: capteur({
+    latitude: 36.8065, longitude: 10.1815, accuracy: 6,
+    altitude: 23.4, altitudeAccuracy: 3,
+  }) });
+  assert.equal(r.ok, true);
+  assert.equal(r.precision, 6);
+  assert.equal(r.altitude, 23.4);
+  assert.equal(r.precisionAltitude, 3);
+  assert.equal(r.horodatage, 1700000000000);
+  assert.equal(r.origine, 'capteur-fin');
+  assert.equal(r.id, 'tunis');
+});
+
+test('UNE ALTITUDE ABSENTE NE DEVIENT PAS LE NIVEAU DE LA MER', () => {
+  // `Number(null)` vaut 0 : le piège transformerait « je ne sais pas » en
+  // « zéro mètre », et une précision absente en « parfaite ».
+  return localiser({ geo: capteur({
+    latitude: 36.8065, longitude: 10.1815, accuracy: null,
+    altitude: null, altitudeAccuracy: null,
+  }) }).then((r) => {
+    assert.equal(r.altitude, null);
+    assert.equal(r.precisionAltitude, null);
+    assert.equal(r.precision, null);
+    // Sans précision annoncée, on ne décerne pas la mention « GPS fin ».
+    assert.equal(r.origine, 'capteur');
+  });
+});
+
+test('« GPS fin » n’est décerné que si le relevé le mérite', async () => {
+  // Demander la haute précision ne suffit pas : c'est le résultat qui compte.
+  const large = await localiser({ haute: true, geo: capteur({
+    latitude: 36.8065, longitude: 10.1815, accuracy: 900 }) });
+  assert.equal(large.origine, 'capteur');
+  const sansDemande = await localiser({ haute: false, geo: capteur({
+    latitude: 36.8065, longitude: 10.1815, accuracy: 4 }) });
+  assert.equal(sansDemande.origine, 'capteur');
+});
+
+test('la haute précision ne se contente pas d’un relevé périmé', async () => {
+  let vues = null;
+  await localiser({ haute: true, geo: {
+    getCurrentPosition: (ok, _ko, options) => {
+      vues = options;
+      ok({ coords: { latitude: 36.8, longitude: 10.18, accuracy: 5 }, timestamp: 1 });
+    },
+  } });
+  assert.equal(vues.enableHighAccuracy, true);
+  assert.equal(vues.maximumAge, 0, 'un cache de dix minutes annulerait la demande');
+});

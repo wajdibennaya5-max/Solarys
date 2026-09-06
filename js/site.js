@@ -8,7 +8,11 @@
 import { GOUVERNORATS, nomGouvernorat, zoneSolaire } from './gisement.js';
 import { HYPOTHESES, PUISSANCE } from './etude.js';
 import { formater, formaterRond, echapper } from './prix.js';
-import { localiser, REFUS } from './geo.js';
+import { localiser, REFUS, gouvernoratLePlusProche, enTunisie } from './geo.js';
+import { lireCoordonnees, decrire, formater as formaterPoint } from './localisation.js';
+import { definirFond, fondActif, capacites as capacitesCarte,
+  hotesAAutoriser } from './carte/fonds.js';
+import { creerCarte } from './vues/carte.js';
 import { planCalepinage } from './calepinage.js';
 import { ORIENTATIONS, PENTES, expliquerOrientation } from './orientation.js';
 import { MOIS } from './gisement.js';
@@ -31,7 +35,7 @@ import { repondre as repondreCopilote, suggestions as suggestionsCopilote, MODES
   from './copilote.js';
 import { panneauFinancier, panneauOptimiseur, panneauLaboratoire, panneauCopilote,
   reponseCopilote, ficheSite, barreComposition, panneauProvenance,
-  centreDonnees } from './tableau.js';
+  centreDonnees, fichePosition } from './tableau.js';
 import { fusionner, raconterComposition } from './fusion.js';
 import { definirRelais, disponible as serviceDisponible, ATTRIBUTION,
   RAISON_INDISPONIBLE } from './pvgis/config.js';
@@ -40,8 +44,8 @@ import { noter, proteger, surveiller, resume as resumeJournal, enTexte, CORRELAT
 import { dimensionner, verdictGlobal } from './technique.js';
 import { construireRapport } from './rapport.js';
 import { reponses, simulation, reinitialiserSimulation, cotesToit, reglagePose,
-  donneesEtude, etudeCourante, scenariosCourants, definirProductibleMesure }
-  from './etat.js';
+  donneesEtude, etudeCourante, scenariosCourants, definirProductibleMesure,
+  position, definirPosition } from './etat.js';
 import { evaluer } from './score.js';
 import { animerChiffres, compter, mouvementReduit } from './anime.js';
 import { tousLesCas, DUREE as DUREE_VITRE } from './heros.js';
@@ -303,15 +307,44 @@ const ETAPES = [
         <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
         Me localiser
       </button>
+      <button class="btn fantome" type="button" id="localiserFin"
+        title="Sollicite le GPS : plus lent, plus précis">
+        Position précise (GPS)
+      </button>
     </div>
     <p class="indice" id="geoEtat" role="status" aria-live="polite"></p>
+
     <div class="champ">
       <label for="gouvernorat">Gouvernorat</label>
       <select id="gouvernorat" name="gouvernorat">
         <option value="">Choisissez…</option>
         ${GOUVERNORATS.map((g) => `<option value="${g.id}">${g.nom}</option>`).join('')}
       </select>
-    </div>`,
+    </div>
+
+    <details class="repli" id="precisionSite">
+      <summary>Situer précisément le bâtiment
+        <span class="repli-etat" id="precisionEtat"></span></summary>
+
+      <p class="indice">Le gouvernorat suffit à estimer l’ensoleillement. Situer le
+        bâtiment au point permet d’aller plus loin : données solaires locales,
+        altitude, et plus tard le tracé de la toiture.</p>
+
+      <div id="carteSite" class="carte-boite"></div>
+      <p class="indice" id="carteMot"></p>
+
+      <div class="champ">
+        <label for="coordonnees">Coordonnées (latitude, longitude)</label>
+        <input type="text" id="coordonnees" name="coordonnees" inputmode="decimal"
+          autocomplete="off" spellcheck="false"
+          placeholder="36.806500, 10.181500">
+        <p class="indice">Formats acceptés : <code>36.8065, 10.1815</code> ou
+          <code>36°48'23"N 10°10'53"E</code>.</p>
+        <p class="erreur-champ" id="coordonneesErreur" role="alert"></p>
+      </div>
+
+      <div id="fichePos"></div>
+    </details>`,
     valide: (v) => (v ? null : 'Choisissez votre gouvernorat pour continuer.'),
   },
   {
@@ -825,34 +858,198 @@ function brancherOrientation() {
 }
 
 /**
- * La localisation automatique — proposée, jamais imposée.
+ * MODULE 1 — LA LOCALISATION PROFESSIONNELLE.
  *
- * Elle fait gagner un geste, mais elle approxime : à la frontière de deux
- * gouvernorats elle peut se tromper d'une case. Le résultat est donc
- * pré-sélectionné dans la liste, où il reste modifiable d'un geste.
+ * Trois chemins vers le même point : le capteur du terminal, un repère posé
+ * sur la carte, des coordonnées écrites à la main. Aucun n'est meilleur dans
+ * l'absolu — le GPS est inutilisable à l'intérieur d'un bâtiment, la carte
+ * demande un fond, la saisie demande de connaître ses coordonnées. Les trois
+ * existent donc, et chacun étiquette ce qu'il produit.
+ *
+ * Ce qui n'est jamais fait ici : présenter une position comme meilleure
+ * qu'elle n'est. Une position vaut ce que vaut sa source, et la fiche
+ * l'affiche à chaque fois.
  */
-function brancherLocalisation() {
-  const bouton = $('localiser');
-  if (!bouton) return;
-  bouton.addEventListener('click', async () => {
-    const etat = $('geoEtat');
-    bouton.disabled = true;
-    etat.textContent = 'Recherche de votre position…';
-    const r = await localiser();
-    bouton.disabled = false;
-    if (!r.ok) { etat.textContent = REFUS[r.raison]; return; }
-    const liste = $('gouvernorat');
-    liste.value = r.id;
-    reponses.gouvernorat = r.id;
-    // On garde le point exact : le gouvernorat suffit à notre référentiel,
-    // pas à interroger un service de rayonnement, qui travaille au point.
-    reponses.position = {
-      latitude: r.latitude, longitude: r.longitude,
-      precision: r.precision, origine: r.origine,
-    };
-    etat.textContent = `Vous semblez être à ${nomGouvernorat(r.id)}.`
-      + ' Corrigez ci-dessous si ce n’est pas le bon gouvernorat.';
+let carte = null;
+
+/** Le point courant, ou celui du gouvernorat, ou Tunis à défaut de tout. */
+function pointDeDepart() {
+  const p = position();
+  if (Number.isFinite(p.latitude) && Number.isFinite(p.longitude)) {
+    return { latitude: p.latitude, longitude: p.longitude };
+  }
+  return { latitude: 36.8065, longitude: 10.1815 };
+}
+
+/** Redessine la fiche de position et le résumé du volet. */
+function majFichePosition() {
+  const p = position();
+  const portrait = decrire({
+    latitude: p.latitude,
+    longitude: p.longitude,
+    precision: p.precisionPosition,
+    altitude: p.altitude,
+    horodatage: p.horodatagePosition,
+    origine: p.originePosition,
   });
+  const fiche = $('fichePos');
+  if (fiche) {
+    fiche.innerHTML = fichePosition(portrait, {
+      gouvernorat: reponses.gouvernorat ? nomGouvernorat(reponses.gouvernorat) : null,
+    });
+  }
+  const etat = $('precisionEtat');
+  if (etat) {
+    etat.textContent = portrait.connue && p.originePosition !== 'centre-gouvernorat'
+      ? portrait.precision.libelle
+      : 'non situé';
+    etat.className = `repli-etat repli-${portrait.connue
+      && p.originePosition !== 'centre-gouvernorat' ? portrait.precision.cle : 'vide'}`;
+  }
+  const champ = $('coordonnees');
+  if (champ && document.activeElement !== champ
+    && Number.isFinite(p.latitude) && p.originePosition !== 'centre-gouvernorat') {
+    champ.value = formaterPoint(p.latitude, p.longitude);
+  }
+}
+
+/** Retient une position venue de n'importe quel chemin, puis rafraîchit tout. */
+function retenirPosition(brute, { recentrer = true } = {}) {
+  const retenue = definirPosition(brute);
+  if (!retenue) return false;
+  // LE GOUVERNORAT SUIT LE POINT, ET ON LE DIT.
+  //
+  // Défaut observé : un point saisi à Sousse laissait « Ariana » dans la
+  // liste. L'étude calculait alors l'ensoleillement d'Ariana pour un toit de
+  // Sousse, et la carte montrait Sousse — trois écrans d'accord entre eux
+  // sauf sur le lieu. Le point est plus précis que la case : il l'emporte.
+  // Mais un changement silencieux serait aussi trompeur : il est annoncé.
+  const proche = gouvernoratLePlusProche(retenue.latitude, retenue.longitude);
+  if (proche && proche.id !== reponses.gouvernorat) {
+    const avant = reponses.gouvernorat;
+    reponses.gouvernorat = proche.id;
+    const liste = $('gouvernorat');
+    if (liste) liste.value = proche.id;
+    const etat = $('geoEtat');
+    if (etat && avant) {
+      etat.textContent = `Ce point se trouve à ${nomGouvernorat(proche.id)} : le `
+        + `gouvernorat a été mis à jour (il indiquait ${nomGouvernorat(avant)}). `
+        + 'Corrigez la liste si ce n’est pas le bon.';
+    }
+  }
+  if (recentrer) carte?.deplacer(retenue);
+  majFichePosition();
+  memoriser();
+  return true;
+}
+
+/** Le capteur du terminal. `haute` sollicite le GPS. */
+async function demanderPosition(haute) {
+  const etat = $('geoEtat');
+  const boutons = [$('localiser'), $('localiserFin')].filter(Boolean);
+  for (const b of boutons) b.disabled = true;
+  if (etat) {
+    etat.textContent = haute
+      ? 'Recherche GPS en cours… cela peut prendre une dizaine de secondes.'
+      : 'Recherche de votre position…';
+  }
+  const r = await localiser({ haute, delai: haute ? 20000 : 8000 });
+  for (const b of boutons) b.disabled = false;
+  if (!r.ok) { if (etat) etat.textContent = REFUS[r.raison]; return; }
+
+  const liste = $('gouvernorat');
+  if (liste) liste.value = r.id;
+  reponses.gouvernorat = r.id;
+  retenirPosition(r);
+
+  const precision = Number.isFinite(r.precision)
+    ? ` Précision annoncée : ± ${Math.round(r.precision)} m.` : '';
+  if (etat) {
+    etat.textContent = `Vous semblez être à ${nomGouvernorat(r.id)}.${precision}`
+      + ' Corrigez ci-dessous si ce n’est pas le bon gouvernorat.';
+  }
+  $('precisionSite')?.setAttribute('open', '');
+}
+
+/** La saisie manuelle : le dernier recours, et parfois le plus précis. */
+function brancherSaisieCoordonnees() {
+  const champ = $('coordonnees');
+  const erreur = $('coordonneesErreur');
+  if (!champ) return;
+  const appliquer = () => {
+    const texte = champ.value.trim();
+    if (!texte) { if (erreur) erreur.textContent = ''; return; }
+    const lu = lireCoordonnees(texte);
+    if (!lu) {
+      // On ne devine pas : un « 36.8 10.1 » mal recopié deviendrait une
+      // position fausse, affichée avec le même aplomb qu'une bonne.
+      if (erreur) {
+        erreur.textContent = 'Coordonnées non reconnues. Exemple : 36.806500, 10.181500';
+      }
+      return;
+    }
+    if (!enTunisie(lu.latitude, lu.longitude)) {
+      if (erreur) {
+        erreur.textContent = 'Ce point est hors de Tunisie. Vérifiez l’ordre : '
+          + 'la latitude vient en premier.';
+      }
+      return;
+    }
+    if (erreur) erreur.textContent = '';
+    retenirPosition({ ...lu, origine: 'saisie', precision: null });
+  };
+  champ.addEventListener('change', appliquer);
+  champ.addEventListener('blur', appliquer);
+  champ.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); appliquer(); }
+  });
+}
+
+/** La carte, quand la page en déclare une — et l'explication quand non. */
+function brancherCarte() {
+  const boite = $('carteSite');
+  // Quitter l'étape détruit la carte : sans cela, son observateur de taille
+  // continuerait de surveiller un élément que la page a déjà remplacé.
+  carte?.detruire();
+  carte = null;
+  if (!boite) return;
+  carte = creerCarte(boite, {
+    point: pointDeDepart(),
+    zoom: 17,
+    surDeplacement: (p) => retenirPosition(p, { recentrer: false }),
+  });
+  const mot = $('carteMot');
+  if (mot) {
+    const cap = capacitesCarte();
+    const fond = fondActif();
+    mot.textContent = cap.phrase + (fond?.avertissement ? ` ${fond.avertissement}` : '');
+    mot.className = `indice${cap.image ? '' : ' indice-absent'}`;
+  }
+}
+
+/** Branche l'ensemble de l'étape de localisation. */
+function brancherLocalisation() {
+  $('localiser')?.addEventListener('click', () => demanderPosition(false));
+  $('localiserFin')?.addEventListener('click', () => demanderPosition(true));
+  // Changer de gouvernorat sans avoir situé le bâtiment doit recentrer la
+  // carte : la laisser sur Tunis pendant qu'on a choisi Tozeur enverrait
+  // l'utilisateur dessiner un toit à six cents kilomètres de chez lui.
+  $('gouvernorat')?.addEventListener('change', () => {
+    const p = position();
+    if (p.originePosition === 'centre-gouvernorat' || !Number.isFinite(p.latitude)) {
+      carte?.deplacer({ latitude: p.latitude, longitude: p.longitude });
+    }
+    majFichePosition();
+  });
+  brancherSaisieCoordonnees();
+  brancherCarte();
+  majFichePosition();
+  // Ouvrir le volet dès qu'une position existe : la refermer ferait croire
+  // qu'elle a été perdue.
+  const p = position();
+  if (Number.isFinite(p.latitude) && p.originePosition !== 'centre-gouvernorat') {
+    $('precisionSite')?.setAttribute('open', '');
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -1850,6 +2047,40 @@ if (relaisDeclare && serviceDisponible()) {
   if (hote && !csp.includes(hote)) {
     noter('avertissement', 'relais absent de la politique de sécurité', { hote });
   }
+}
+
+/**
+ * Le fond de carte se déclare dans la page, comme le relais solaire :
+ *
+ *     <meta name="carte-fond" content="esri-imagerie">
+ *
+ * Sans balise, la carte reste utilisable — repère, coordonnées et échelle,
+ * sans image du terrain — et elle l'écrit. C'est un état normal, pas une
+ * panne : le projet n'engage personne auprès d'un fournisseur de tuiles tant
+ * que ce n'est pas décidé.
+ */
+const fondDeclare = document.querySelector('meta[name="carte-fond"]')?.content?.trim();
+if (fondDeclare) {
+  const retenu = definirFond(fondDeclare);
+  noter(retenu ? 'info' : 'avertissement', 'fond cartographique',
+    retenu ? { fond: retenu.id, nature: retenu.nature }
+      : { declare: fondDeclare, effet: 'inconnu, carte sans image' });
+
+  // LE FOURNISSEUR DOIT FIGURER DANS `img-src`. Sinon le navigateur refuse
+  // chaque tuile en silence : la carte paraît simplement vide, et on cherche
+  // la panne du côté du réseau pendant une heure.
+  if (retenu) {
+    const csp = document.querySelector('meta[http-equiv="Content-Security-Policy"]')
+      ?.content ?? '';
+    for (const hote of hotesAAutoriser(retenu)) {
+      if (!csp.includes(hote)) {
+        noter('avertissement', 'fond de carte absent de la politique de sécurité',
+          { hote });
+      }
+    }
+  }
+} else {
+  noter('info', 'fond cartographique', { etat: 'non configuré' });
 }
 
 surveiller((message) => {

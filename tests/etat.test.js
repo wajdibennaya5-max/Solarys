@@ -127,3 +127,54 @@ test('oublier les réponses ne laisse rien derrière', () => {
   oublierReponses();
   assert.deepEqual(Object.keys(reponses), []);
 });
+
+test('LE REPLI SUR LE CENTRE DU GOUVERNORAT FOURNIT ENFIN DES COORDONNÉES', async () => {
+  // DÉFAUT CORRIGÉ : `CENTRES` range ses points en tableaux `[lat, lon]` et ce
+  // code lisait `centre.lat`. Il rendait `undefined` à chaque fois. Le service
+  // de rayonnement était donc interrogé sans coordonnées, c'est-à-dire jamais,
+  // et personne ne s'en apercevait.
+  const { reponses, position, oublierPosition } = await import('../js/etat.js');
+  oublierPosition();
+  reponses.gouvernorat = 'sfax';
+  const p = position();
+  assert.equal(p.originePosition, 'centre-gouvernorat');
+  assert.ok(Number.isFinite(p.latitude), 'latitude absente');
+  assert.ok(Number.isFinite(p.longitude), 'longitude absente');
+  assert.ok(Math.abs(p.latitude - 34.74) < 0.01);
+  assert.ok(Math.abs(p.longitude - 10.76) < 0.01);
+  // Et la précision annoncée est celle d'un centre administratif, pas d'un toit.
+  assert.equal(p.precisionPosition, 30000);
+});
+
+test('une position ne se retient qu’avec son origine', async () => {
+  const { definirPosition, position, oublierPosition } = await import('../js/etat.js');
+  const r = definirPosition({ latitude: 36.8065, longitude: 10.1815, precision: 8,
+    altitude: 23, horodatage: 1700000000000, origine: 'capteur-fin' });
+  assert.equal(r.origine, 'capteur-fin');
+  const p = position();
+  assert.equal(p.latitude, 36.8065);
+  assert.equal(p.altitude, 23);
+  assert.equal(p.horodatagePosition, 1700000000000);
+  assert.equal(p.precisionPosition, 8);
+  oublierPosition();
+});
+
+test('UNE POSITION INEXPLOITABLE NE REMPLACE PAS LA BONNE', async () => {
+  const { definirPosition, position, oublierPosition } = await import('../js/etat.js');
+  oublierPosition();
+  definirPosition({ latitude: 36.8065, longitude: 10.1815, origine: 'carte' });
+  for (const mauvaise of [null, {}, { latitude: 'x', longitude: 2 },
+    { latitude: 95, longitude: 10 }, { latitude: 36, longitude: 400 }]) {
+    assert.equal(definirPosition(mauvaise), null);
+  }
+  assert.equal(position().latitude, 36.8065, 'la bonne position a été écrasée');
+  oublierPosition();
+});
+
+test('une altitude absente reste absente, elle ne devient pas zéro', async () => {
+  const { definirPosition, position, oublierPosition } = await import('../js/etat.js');
+  definirPosition({ latitude: 36.8, longitude: 10.1, origine: 'saisie' });
+  assert.equal(position().altitude, null);
+  assert.equal(position().precisionPosition, null);
+  oublierPosition();
+});
