@@ -151,11 +151,11 @@ export function phraseCo2(etude) {
 
 /** Les icônes du tableau de bord, au trait, sans dépendance. */
 export const ICONES = {
-  soleil: '<svg class="kpi-ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.6M12 19.4V22M2 12h2.6M19.4 12H22M4.9 4.9l1.9 1.9M17.2 17.2l1.9 1.9M19.1 4.9l-1.9 1.9M6.8 17.2l-1.9 1.9"/></svg>',
-  eclair: '<svg class="kpi-ic" viewBox="0 0 24 24"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></svg>',
-  monnaie: '<svg class="kpi-ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9.2a3 3 0 0 0-3-1.6c-1.7 0-3 .9-3 2.2 0 2.9 6 1.5 6 4.4 0 1.3-1.3 2.2-3 2.2a3 3 0 0 1-3-1.6M12 6v12"/></svg>',
-  courbe: '<svg class="kpi-ic" viewBox="0 0 24 24"><path d="M3 17l5.5-6 4 3.5L21 6"/><path d="M15 6h6v6"/></svg>',
-  feuille: '<svg class="kpi-ic" viewBox="0 0 24 24"><path d="M20 4C10 4 4 9 4 16c0 2 .6 3.4.6 3.4S9 12 20 10c0 0-3 8-10 9"/><path d="M4 20c0-4 3-7 7-8"/></svg>',
+  soleil: '<svg aria-hidden="true" class="kpi-ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.6M12 19.4V22M2 12h2.6M19.4 12H22M4.9 4.9l1.9 1.9M17.2 17.2l1.9 1.9M19.1 4.9l-1.9 1.9M6.8 17.2l-1.9 1.9"/></svg>',
+  eclair: '<svg aria-hidden="true" class="kpi-ic" viewBox="0 0 24 24"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></svg>',
+  monnaie: '<svg aria-hidden="true" class="kpi-ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9.2a3 3 0 0 0-3-1.6c-1.7 0-3 .9-3 2.2 0 2.9 6 1.5 6 4.4 0 1.3-1.3 2.2-3 2.2a3 3 0 0 1-3-1.6M12 6v12"/></svg>',
+  courbe: '<svg aria-hidden="true" class="kpi-ic" viewBox="0 0 24 24"><path d="M3 17l5.5-6 4 3.5L21 6"/><path d="M15 6h6v6"/></svg>',
+  feuille: '<svg aria-hidden="true" class="kpi-ic" viewBox="0 0 24 24"><path d="M20 4C10 4 4 9 4 16c0 2 .6 3.4.6 3.4S9 12 20 10c0 0-3 8-10 9"/><path d="M4 20c0-4 3-7 7-8"/></svg>',
 };
 
 /**

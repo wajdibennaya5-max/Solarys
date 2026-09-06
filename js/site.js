@@ -295,7 +295,7 @@ const ETAPES = [
     aide: 'Le soleil de Tozeur n’est pas celui de Bizerte : le calcul en tient compte.',
     champ: () => `<div class="geo">
       <button class="btn" type="button" id="localiser">
-        <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
         Me localiser
       </button>
     </div>
@@ -441,7 +441,7 @@ const ETAPES = [
       </button>`).join('')}
     </div>
     <p style="margin-top:16px"><button type="button" class="btn or" id="optimiser">
-      <svg viewBox="0 0 24 24"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></svg>
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></svg>
       Optimiser automatiquement</button></p>
     <div class="apercu-pose" id="apercuPose" role="status" aria-live="polite"></div>`,
     lire: () => ({ module: $('modulePv')?.value ?? MODULE_DEFAUT.id, pose: poseChoisie }),
@@ -550,7 +550,7 @@ function proposerReprise() {
  * Les étapes franchies sont cliquables : revenir corriger un chiffre ne doit
  * pas coûter quatre clics sur « Retour ».
  */
-const COCHE = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" '
+const COCHE = '<svg aria-hidden="true" viewBox="0 0 24 24" width="13" height="13" fill="none" '
   + 'stroke="currentColor" stroke-width="3.4" stroke-linecap="round" '
   + 'stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
 
@@ -1045,7 +1045,7 @@ function dessinerResultat() {
         installateur accepte comme base de devis — et que vous pouvez opposer à
         trois devis contradictoires.</p>
       <ul>${OFFRE.contenu.map((c) => `<li>
-        <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>${c}</li>`).join('')}</ul>
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>${c}</li>`).join('')}</ul>
       <div id="demande"></div>
     </div>
 
@@ -1057,7 +1057,7 @@ function dessinerResultat() {
         un installateur.</p>
       <div class="rapport-actes">
         <button class="btn primaire" type="button" id="obtenirRapport">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6M9 11h3"/></svg>
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6M9 11h3"/></svg>
           Obtenir mon rapport</button>
         <button class="btn" type="button" id="versEtude">
           Demander une étude technique</button>
