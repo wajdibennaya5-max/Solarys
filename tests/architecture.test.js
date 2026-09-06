@@ -31,7 +31,7 @@ export const DOMAINE = [
   'etude.js', 'scenarios.js', 'tarif.js', 'profil.js', 'consommation.js',
   'batiment.js', 'co2.js', 'score.js', 'technique.js', 'validation.js',
   'calepinage.js', 'gisement.js', 'orientation.js', 'facture.js', 'materiel.js',
-  'finances.js', 'prix.js', 'provenance.js', 'localisation.js', 'toiture.js',
+  'finances.js', 'prix.js', 'provenance.js', 'localisation.js', 'toiture.js', 'scene3d.js',
   // La géométrie d'une carte est du calcul : une projection, des tuiles, une
   // échelle. Elle ne visite aucune adresse, elle en compose.
   'carte/tuiles.js', 'carte/fonds.js',
@@ -60,7 +60,7 @@ const INFRASTRUCTURE = ['session.js', 'prospect.js', 'geo.js', 'journal.js',
  * cents lignes. Une vue a le droit de toucher au document — mais seulement au
  * sien — et n'a pas le droit de calculer : elle demande au domaine.
  */
-const VUES = ['vues/carte.js'];
+const VUES = ['vues/carte.js', 'vues/scene.js'];
 
 /** CONTRÔLEUR : le seul à orchestrer la page entière. */
 const CONTROLEUR = ['site.js'];

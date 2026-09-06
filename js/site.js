@@ -15,6 +15,9 @@ import { mesurer as mesurerToit, etalonner,
 import { definirFond, fondActif, capacites as capacitesCarte,
   hotesAAutoriser } from './carte/fonds.js';
 import { creerCarte } from './vues/carte.js';
+import { creerScene3d } from './vues/scene.js';
+import { construireScene } from './scene3d.js';
+import { projeter as projeterSommets } from './toiture.js';
 import { planCalepinage } from './calepinage.js';
 import { ORIENTATIONS, PENTES, expliquerOrientation } from './orientation.js';
 import { MOIS } from './gisement.js';
@@ -454,6 +457,22 @@ const ETAPES = [
       </div>
 
       <div id="traceMesures"></div>
+
+      <details class="repli" id="vue3dToit">
+        <summary>Voir le bâtiment en volume
+          <span class="repli-etat" id="vue3dEtat">sans contour</span></summary>
+        <p class="indice">Le volume est reconstitué à partir du contour tracé, de la
+          pente et de l’orientation déclarées. Un seul pan, comme le reste du
+          calcul : montrer quatre pans que l’étude ignore donnerait une belle image
+          et des chiffres faux.</p>
+        <div class="champ">
+          <label for="hauteurMur">Hauteur du mur sous l’égout (m)</label>
+          <input id="hauteurMur" name="hauteurMur" type="number" inputmode="decimal"
+            min="0" max="40" step="0.1" value="3">
+        </div>
+        <div id="scene3d" class="scene-boite"></div>
+        <div id="arbreScene"></div>
+      </details>
 
       <details class="repli" id="etalonnageToit">
         <summary>L’échelle ne tombe pas juste ?
@@ -1166,6 +1185,10 @@ function majTrace() {
   const champRef = $('etalonTrace');
   if (champRef) champRef.value = ref ? ref.longueur.toFixed(2) : '';
 
+  // Le volume suit le tracé : le laisser en arrière montrerait un bâtiment
+  // qui ne correspond plus aux mètres carrés affichés au-dessus.
+  majVue3d();
+
   const zone = $('traceMesures');
   if (!zone) return;
   if (!sommetsToit.length) {
@@ -1247,6 +1270,102 @@ function appliquerTrace() {
 const AZIMUTS_FORMULAIRE = { sud: 0, 'sud-est': -45, 'sud-ouest': 45,
   est: -90, ouest: 90, 'nord-est': -135, 'nord-ouest': 135, nord: 180 };
 
+/* ------------------------------------------------------------------ */
+/* MODULE 3 — LE BÂTIMENT EN VOLUME                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * POURQUOI LA 3D SERT À AUTRE CHOSE QU'À FAIRE JOLI.
+ *
+ * Une surface se mesure à plat. Une implantation, non : une pente, un débord,
+ * un mur mitoyen plus haut ne se lisent pas sur un plan. C'est en volume qu'on
+ * voit qu'un pan descend du mauvais côté — et c'est exactement le défaut qui
+ * s'est glissé dans le premier jet de la géométrie, invisible sur le papier.
+ *
+ * LE MODÈLE EST DÉLIBÉRÉMENT PAUVRE : un seul pan, d'une seule pente, d'une
+ * seule orientation. C'est le toit que le reste du projet calcule. Dessiner
+ * ici une toiture à quatre pans que le gisement, le calepinage et l'étude
+ * ignorent donnerait une belle image et une étude fausse — c'est la sorte de
+ * mensonge tranquille que ce projet refuse.
+ */
+let vue3d = null;
+
+/** La hauteur de mur déclarée, en mètres. */
+function hauteurMurSaisie() {
+  const v = Number($('hauteurMur')?.value);
+  return Number.isFinite(v) && v >= 0 && v <= 40 ? v : 3;
+}
+
+/**
+ * La scène, construite depuis le contour tracé.
+ *
+ * Le contour est géographique ; la scène est métrique. `projeter` fait la
+ * bascule, et c'est le même code qui sert aux mesures : deux projections
+ * différentes donneraient un volume qui ne correspondrait pas aux mètres
+ * carrés affichés juste au-dessus.
+ */
+function sceneCourante() {
+  if (sommetsToit.length < 3) return null;
+  const { points } = projeterSommets(sommetsToit);
+  const m = mesuresToit();
+  if (!m.exploitable) return null;
+  // L'étalonnage porte sur les longueurs : la scène doit en tenir compte,
+  // sinon le volume affiché ne serait pas celui qu'on a mesuré.
+  const k = m.facteur;
+  const azPan = azimutProbableDuPan(m);
+  return construireScene(points.map((p) => ({ x: p.x * k, y: p.y * k })), {
+    pente: penteDegres(),
+    azimut: azPan ?? 0,
+    hauteurMur: hauteurMurSaisie(),
+  });
+}
+
+/** L'arborescence de la scène : ce qui est représenté, et d'où ça vient. */
+function arbreScene(scene, m) {
+  if (!scene) return '';
+  const murs = scene.faces.filter((f) => f.role === 'mur').length;
+  const branche = (nom, detail, source) => `<li><b>${nom}</b>
+    <span>${detail}</span><i>${source}</i></li>`;
+  return `<ul class="arbre">
+    ${branche('Terrain', 'plan horizontal', 'repère de lecture, non mesuré')}
+    ${branche('Bâtiment', `${murs} murs, ${hauteurMurSaisie().toFixed(1)} m sous égout`,
+    'hauteur saisie')}
+    ${branche('Toiture', `1 pan, ${Math.round(scene.toit.pente)}° de pente, `
+      + `${m.surfaceRampant.toFixed(1)} m² de rampant`, 'contour tracé sur la carte')}
+    ${branche('Obstacles', 'aucun', 'pas encore relevés')}
+    ${branche('Générateur', 'aucun module posé', 'à venir')}
+  </ul>
+  <p class="indice">Faîtage à ${scene.toit.hauteurMax.toFixed(2)} m, égout à
+    ${scene.toit.hauteurMin.toFixed(2)} m — déduits du contour et de la pente,
+    non mesurés sur place.</p>`;
+}
+
+/** Met la scène à jour depuis le tracé courant. */
+function majVue3d() {
+  const scene = sceneCourante();
+  vue3d?.definirScene(scene);
+  const etat = $('vue3dEtat');
+  if (etat) {
+    etat.textContent = scene
+      ? `${scene.toit.hauteurMax.toFixed(1)} m au faîtage` : 'sans contour';
+    etat.className = `repli-etat repli-${scene ? 'bonne' : 'vide'}`;
+  }
+  const arbre = $('arbreScene');
+  if (arbre) arbre.innerHTML = scene ? arbreScene(scene, mesuresToit()) : '';
+}
+
+/** Branche la vue en volume. */
+function brancherVue3d() {
+  const boite = $('scene3d');
+  vue3d?.detruire();
+  vue3d = null;
+  if (!boite) return;
+  vue3d = creerScene3d(boite, { scene: sceneCourante() });
+  $('hauteurMur')?.addEventListener('input', majVue3d);
+  $('hauteurMur')?.addEventListener('change', majVue3d);
+  majVue3d();
+}
+
 /** L'étalonnage manuel de l'échelle. */
 function brancherEtalonnage() {
   const mot = $('etalonMot');
@@ -1318,7 +1437,9 @@ function brancherTracage() {
   $('traceCadrer')?.addEventListener('click', () => carteToit?.cadrerSur(sommetsToit));
   $('traceAppliquer')?.addEventListener('click', appliquerTrace);
   $('pente')?.addEventListener('change', majTrace);
+  $('orientation')?.addEventListener('change', majVue3d);
   brancherEtalonnage();
+  brancherVue3d();
   majTrace();
 }
 

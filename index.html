@@ -1159,6 +1159,48 @@ footer .bas{margin-top:36px;padding-top:20px;border-top:1px solid rgba(255,255,2
 .pos-phrase.applique{margin:0 0 10px;padding:10px 12px;border-radius:10px;
   background:#e4f5e8;color:#1c6b34;font-weight:600;font-size:13px;line-height:1.5}
 .repli .repli{margin-top:14px;background:var(--surface-2,#f6f8fa)}
+
+/* ---- Vue en volume ---- */
+/* LA HAUTEUR APPARTIENT AU CONTENEUR — même règle que pour la carte, et pour
+   une raison plus vicieuse encore : `creerScene3d` pose `scene3d` SUR
+   l'élément qui porte `scene-boite`, et un `height:100%` y rendait la hauteur
+   indéfinie. La toile grandissait alors le conteneur, qui redéclenchait le
+   rendu, qui regrandissait la toile — une boucle sans fin dans laquelle aucun
+   bouton ne restait immobile assez longtemps pour être cliqué. */
+.scene-boite{height:440px;margin:12px 0 10px}
+.scene3d{position:relative;display:flex;flex-direction:column;gap:8px;
+  width:100%;min-height:320px;padding:8px;box-sizing:border-box;
+  background:var(--surface-2,#eef1f5);border:1px solid var(--bord);border-radius:14px}
+.scene3d:focus-visible{outline:3px solid var(--or);outline-offset:2px}
+.scene3d-toile{display:block;width:100%;flex:1 1 auto;border-radius:10px;
+  background:linear-gradient(180deg,#dfe7f0 0%,#eef1f5 62%,#e6e4dc 100%);
+  touch-action:none;cursor:grab;min-height:180px}
+.scene3d-toile:active{cursor:grabbing}
+.scene3d-vues,.scene3d-couches{display:flex;flex-wrap:wrap;gap:6px}
+.scene3d-vue,.scene3d-couche{flex:1 1 auto;min-height:36px;padding:8px 10px;
+  border-radius:8px;border:1px solid var(--bord);background:rgba(255,255,255,.9);
+  color:var(--encre-2);font:700 12px/1 inherit;cursor:pointer;white-space:nowrap}
+.scene3d-vue:hover,.scene3d-couche:hover{border-color:var(--or)}
+.scene3d-vue:focus-visible,.scene3d-couche:focus-visible{outline:3px solid var(--or);
+  outline-offset:2px}
+.scene3d-vue.actif{background:var(--nuit);color:#fff;border-color:var(--nuit)}
+.scene3d-couche{opacity:.5;text-decoration:line-through}
+.scene3d-couche.actif{opacity:1;text-decoration:none;background:#fff;
+  border-color:var(--or);color:var(--nuit)}
+.scene3d-legende{margin:0;font-size:11.5px;color:var(--encre-3);line-height:1.4}
+.scene3d-reserve{margin:0;font-size:11px;font-style:italic;color:var(--encre-3);
+  line-height:1.35}
+
+.arbre{list-style:none;margin:10px 0 0;padding:0;border:1px solid var(--bord);
+  border-radius:10px;overflow:hidden;background:var(--surface)}
+.arbre li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;
+  padding:9px 12px;font-size:13px;border-bottom:1px solid var(--bord)}
+.arbre li:last-child{border-bottom:none}
+.arbre li b{min-width:88px;color:var(--nuit)}
+.arbre li span{flex:1 1 auto;color:var(--encre-2)}
+.arbre li i{font-size:11.5px;color:var(--encre-3);font-style:italic}
+@media (max-width:400px){.scene-boite{height:460px}
+  .scene3d-vue,.scene3d-couche{font-size:11.5px;padding:8px 7px}}
 </style>
 </head>
 <body>
