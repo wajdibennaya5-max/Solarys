@@ -17,14 +17,24 @@ import { join } from 'node:path';
 
 const RACINE = new URL('../js/', import.meta.url).pathname;
 const lire = (f) => readFileSync(join(RACINE, f), 'utf8');
-const tous = readdirSync(RACINE).filter((f) => f.endsWith('.js'));
+
+/** Tous les modules, y compris ceux des sous-dossiers d'intégration. */
+function modules(prefixe = '') {
+  return readdirSync(join(RACINE, prefixe), { withFileTypes: true })
+    .flatMap((e) => (e.isDirectory() ? modules(join(prefixe, e.name))
+      : (e.name.endsWith('.js') ? [join(prefixe, e.name)] : [])));
+}
+const tous = modules();
 
 /** DOMAINE : le calcul. Ne connaît ni la page, ni le stockage, ni le réseau. */
 export const DOMAINE = [
   'etude.js', 'scenarios.js', 'tarif.js', 'profil.js', 'consommation.js',
   'batiment.js', 'co2.js', 'score.js', 'technique.js', 'validation.js',
   'calepinage.js', 'gisement.js', 'orientation.js', 'facture.js', 'materiel.js',
-  'finances.js', 'prix.js',
+  'finances.js', 'prix.js', 'provenance.js',
+  // La composition des requêtes et la lecture des réponses sont du calcul
+  // pur : elles ne parlent à personne, elles transforment des données.
+  'pvgis/parametres.js', 'pvgis/reponse.js', 'pvgis/erreurs.js', 'pvgis/config.js',
 ];
 
 /** APPLICATION : orchestre le domaine. Ne dessine rien. */
@@ -35,7 +45,10 @@ const APPLICATION = ['moteur.js', 'diagnostics.js', 'optimiseur.js', 'copilote.j
 const PRESENTATION = ['tableau.js', 'graphe.js', 'rapport.js', 'marque.js', 'anime.js'];
 
 /** INFRASTRUCTURE : stockage, réseau, position, journal. */
-const INFRASTRUCTURE = ['session.js', 'prospect.js', 'geo.js', 'journal.js'];
+const INFRASTRUCTURE = ['session.js', 'prospect.js', 'geo.js', 'journal.js',
+  // Le client parle au réseau, le cache au stockage : ils sont ici, et pas
+  // dans le domaine, précisément pour cette raison.
+  'pvgis/client.js', 'pvgis/cache.js'];
 
 /** CONTRÔLEUR : le seul à toucher au document. */
 const CONTROLEUR = ['site.js'];
@@ -77,10 +90,13 @@ test('le domaine n’importe jamais la présentation ni l’infrastructure', () 
   for (const f of DOMAINE) {
     const code = lire(f);
     for (const interdit of [...PRESENTATION, ...INFRASTRUCTURE, ...APPLICATION, ...CONTROLEUR]) {
-      // `prix.js` est du formatage pur : le domaine peut s'en servir.
-      if (interdit === 'prix.js') continue;
-      assert.ok(!code.includes(`./${interdit}`),
-        `${f} importe ${interdit} : le calcul dépend d’une couche supérieure`);
+      // `prix.js` est du formatage pur, `provenance.js` de l'étiquetage :
+      // le domaine peut s'en servir.
+      if (interdit === 'prix.js' || interdit === 'provenance.js') continue;
+      const nom = interdit.split('/').pop();
+      assert.ok(!new RegExp(`from\\s+['"][./]*(?:pvgis/)?${nom.replace('.', '\\.')}['"]`)
+        .test(code),
+      `${f} importe ${interdit} : le calcul dépend d’une couche supérieure`);
     }
   }
 });
@@ -128,7 +144,8 @@ test('aucun import ne pointe hors du projet', () => {
   // chargé, et sans chaîne d'approvisionnement à surveiller.
   for (const f of tous) {
     for (const m of lire(f).matchAll(/from\s+['"]([^'"]+)['"]/g)) {
-      assert.ok(m[1].startsWith('./'), `${f} importe ${m[1]} depuis l’extérieur`);
+      assert.ok(m[1].startsWith('./') || m[1].startsWith('../'),
+        `${f} importe ${m[1]} depuis l’extérieur`);
     }
   }
 });
