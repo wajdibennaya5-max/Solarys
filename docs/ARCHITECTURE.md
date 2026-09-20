@@ -6,7 +6,7 @@
 en découle, et deux tests le vérifient à chaque exécution
 (`tests/architecture.test.js`).
 
-C'est ce qui rend les 361 tests possibles sans navigateur : on peut vérifier
+C'est ce qui rend les 481 tests possibles sans navigateur : on peut vérifier
 une tension de chaîne, un temps de retour ou une part autoconsommée en
 important un module et en l'appelant.
 
@@ -22,7 +22,10 @@ ajouter un module sans dire à quelle couche il appartient.
 
 `etude` · `scenarios` · `tarif` · `profil` · `consommation` · `batiment` ·
 `co2` · `score` · `technique` · `validation` · `calepinage` · `gisement` ·
-`orientation` · `facture` · `materiel` · `finances` · `prix`
+`orientation` · `facture` · `materiel` · `finances` · `prix` ·
+`centrale/modele` · `centrale/catalogue` · `centrale/topologie` ·
+`centrale/generation` · `centrale/propagation` · `centrale/commandes` ·
+`centrale/defauts`
 
 Interdits par test : `document`, `window`, `innerHTML`, `localStorage`,
 `getElementById`, `addEventListener`, `fetch`. Interdit aussi d'importer une
@@ -32,7 +35,7 @@ rapport ni au serveur.
 ### APPLICATION — l'orchestration
 
 `moteur` · `diagnostics` · `optimiseur` · `copilote` · `laboratoire` ·
-`heros` · `etat`
+`heros` · `etat` · `centrale/simulateur`
 
 Compose le domaine, ne dessine rien. Mêmes interdits que le domaine sur le
 DOM. `etat.js` porte l'état de la simulation et l'assemblage des données du
@@ -41,7 +44,9 @@ bâtiment et quel module entrent dans l'étude.
 
 ### PRÉSENTATION — la mise en forme
 
-`tableau` · `graphe` · `rapport` · `marque` · `anime`
+`tableau` · `graphe` · `rapport` · `marque` · `anime` · `centrale/symboles` ·
+`centrale/vue-plan` · `centrale/vue-schema` · `centrale/vue-scada` ·
+`centrale/ecran`
 
 Reçoit des résultats déjà calculés et rend du HTML ou du SVG. **Interdit
 d'importer un moteur de calcul** : deux chemins produiraient deux chiffres, et
@@ -50,7 +55,8 @@ ils divergeraient.
 ### INFRASTRUCTURE — le monde extérieur
 
 `session` (stockage local) · `prospect` (envoi au serveur) · `geo`
-(géolocalisation) · `journal` (observabilité)
+(géolocalisation) · `journal` (observabilité) · `centrale/stockage`
+(la centrale rangée dans le navigateur)
 
 Seule couche autorisée à parler au stockage, au réseau et au capteur de
 position.
@@ -83,6 +89,18 @@ Il n'exporte rien : personne ne doit pouvoir l'importer, sous peine de cycle.
 
 Un seul chemin, un seul résultat. Le tableau de bord, le rapport imprimé et
 l'assistant lisent **le même objet** : ils ne peuvent pas se contredire.
+
+## Le simulateur de centrale
+
+`js/centrale/` suit ces quatre couches plutôt que d'en créer de concurrentes,
+et ses quatorze fichiers sont déclarés dans le test d'architecture comme tous
+les autres. Une exception apparente mérite d'être nommée : `centrale/ecran.js`
+est en **présentation** bien qu'il écoute des appuis. Il le peut parce qu'il
+ne cherche rien dans la page — il construit son propre sous-arbre et en garde
+la référence — et parce que `site.js` lui **remet** le simulateur et la
+persistance. Il ne peut donc ni calculer ni écrire : il ne peut que montrer.
+
+Voir `docs/simulateur.md`.
 
 ## Ce qui n'est pas ici
 

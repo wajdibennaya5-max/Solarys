@@ -35,20 +35,41 @@ export const DOMAINE = [
   // La composition des requêtes et la lecture des réponses sont du calcul
   // pur : elles ne parlent à personne, elles transforment des données.
   'pvgis/parametres.js', 'pvgis/reponse.js', 'pvgis/erreurs.js', 'pvgis/config.js',
+  // LE SIMULATEUR DE CENTRALE — modèle et moteur.
+  //
+  // `modele` et `catalogue` sont des données pures ; `topologie`,
+  // `generation`, `propagation`, `commandes` et `defauts` sont des fonctions
+  // qui transforment un graphe en réponses. Aucun ne connaît la page : c'est
+  // ce qui permet de jouer une séquence d'exploitation entière dans un test,
+  // sans navigateur.
+  'centrale/modele.js', 'centrale/catalogue.js', 'centrale/topologie.js',
+  'centrale/generation.js', 'centrale/propagation.js', 'centrale/commandes.js',
+  'centrale/defauts.js',
 ];
 
 /** APPLICATION : orchestre le domaine. Ne dessine rien. */
 const APPLICATION = ['moteur.js', 'diagnostics.js', 'optimiseur.js', 'copilote.js',
-  'laboratoire.js', 'heros.js', 'etat.js', 'fusion.js'];
+  'laboratoire.js', 'heros.js', 'etat.js', 'fusion.js',
+  // Le simulateur orchestre le moteur de centrale et garde la mémoire de la
+  // session — énergie accumulée, historique, sélection. Il ne dessine rien.
+  'centrale/simulateur.js'];
 
 /** PRÉSENTATION : met en forme. Ne décide de rien. */
-const PRESENTATION = ['tableau.js', 'graphe.js', 'rapport.js', 'marque.js', 'anime.js'];
+const PRESENTATION = ['tableau.js', 'graphe.js', 'rapport.js', 'marque.js', 'anime.js',
+  // Les vues du simulateur. `ecran.js` assemble et écoute, mais il ne cherche
+  // rien dans la page : il construit son propre sous-arbre et en garde la
+  // référence. Le simulateur et la persistance lui sont REMIS — il ne peut
+  // donc ni calculer une tension, ni écrire dans le navigateur.
+  'centrale/symboles.js', 'centrale/vue-plan.js', 'centrale/vue-schema.js',
+  'centrale/vue-scada.js', 'centrale/ecran.js'];
 
 /** INFRASTRUCTURE : stockage, réseau, position, journal. */
 const INFRASTRUCTURE = ['session.js', 'prospect.js', 'geo.js', 'journal.js',
   // Le client parle au réseau, le cache au stockage : ils sont ici, et pas
   // dans le domaine, précisément pour cette raison.
-  'pvgis/client.js', 'pvgis/cache.js'];
+  'pvgis/client.js', 'pvgis/cache.js',
+  // La centrale rangée dans le navigateur, même patron que `session.js`.
+  'centrale/stockage.js'];
 
 /** CONTRÔLEUR : le seul à toucher au document. */
 const CONTROLEUR = ['site.js'];

@@ -36,8 +36,24 @@ js/etude.js         dimensionnement, production, économie, temps de retour
 js/prix.js          le dinar en millimes, mise en forme tunisienne
 js/prospect.js      la demande WhatsApp, et l'offre payante
 js/site.js          le tunnel en quatre étapes et l'affichage du résultat
-tests/              28 tests
+js/centrale/        le simulateur de centrale (voir docs/simulateur.md)
+tests/              481 tests
 ```
+
+## Le simulateur de centrale
+
+À côté de l'estimation résidentielle, `js/centrale/` fait vivre une centrale
+de grande puissance : on donne une puissance crête visée, le moteur en déduit
+une architecture entière — longueur de chaîne, onduleurs, transformateurs,
+cellules, protections — puis on ouvre un disjoncteur, on simule un défaut, et
+on voit ce qui tombe. Plan, schéma unifilaire, supervision.
+
+La topologie est un graphe : « cet équipement est-il alimenté, isolé, en
+défaut » se répond par un parcours, jamais par une règle codée en dur. Les
+caractéristiques de matériel sont **génériques et annoncées comme telles** —
+aucune fiche constructeur n'est inventée.
+
+Décisions techniques, défauts trouvés et limites connues : `docs/simulateur.md`.
 
 ## Le modèle
 
@@ -50,7 +66,7 @@ accepte comme base de devis. Son prix et son contenu se règlent dans
 
 ```bash
 npm start   # http://localhost:8080
-npm test    # 28 tests
+npm test    # 481 tests
 ```
 
 Aucune dépendance, aucune étape de construction : des modules JavaScript natifs
