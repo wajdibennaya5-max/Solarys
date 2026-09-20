@@ -50,6 +50,10 @@ import { construireGraphe, grapheMensuel, grapheComparaison, diagrammeFlux }
 import { OFFRE, CONTACT, ouverte, redigerDemande, lienDemande, champsManquants,
   envoyerAuServeur, API } from './prospect.js';
 import { enregistrer, relire, effacer, ageEnClair } from './session.js';
+import { creerSimulateur } from './centrale/simulateur.js';
+import { monterEcran } from './centrale/ecran.js';
+import { enregistrer as rangerCentrale, relire as relireCentrale }
+  from './centrale/stockage.js';
 import { scenarioParDefaut, ecart } from './scenarios.js';
 
 const $ = (id) => document.getElementById(id);
@@ -1864,3 +1868,54 @@ proteger('accueil', () => brancherVitre());
 $('annee').textContent = new Date().getFullYear();
 dessinerEtape();
 proposerReprise();
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE SIMULATEUR DE CENTRALE.
+ *
+ * MONTÉ À LA DEMANDE, ET JAMAIS AVANT. Construire une centrale, même de
+ * cinq mégawatts, coûte quelques millisecondes et plusieurs dizaines de
+ * kilo-octets ; les dépenser au chargement pénaliserait les neuf visiteurs
+ * sur dix qui viennent estimer leur toiture. Le premier appui les paie, et
+ * lui seul.
+ *
+ * C'est ici — et ici seulement — que les trois couches se rencontrent : le
+ * contrôleur va chercher le nœud dans le document, construit le simulateur,
+ * et REMET à l'écran la persistance sous forme de fonctions. L'écran ne peut
+ * donc ni calculer ni écrire dans le navigateur : il ne peut que montrer.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+let centraleMontee = null;
+
+function ouvrirSimulateurCentrale() {
+  const hote = $('centraleEcran');
+  const bouton = $('ouvrirCentrale');
+  if (!hote) return;
+
+  if (centraleMontee) {
+    hote.hidden = !hote.hidden;
+    if (bouton) {
+      bouton.textContent = hote.hidden ? 'Ouvrir le simulateur' : 'Replier le simulateur';
+    }
+    return;
+  }
+
+  proteger('simulateur de centrale', () => {
+    const sim = creerSimulateur({ puissanceDc: 5000 });
+
+    // Une centrale laissée en plan se retrouve telle quelle : consignations
+    // comprises. C'est précisément ce qu'on ne doit pas perdre.
+    const repris = relireCentrale();
+    if (repris && sim.restaurer(repris.instantane)) {
+      noter('info', 'centrale reprise', { age: ageEnClair(repris.age) });
+    }
+
+    hote.hidden = false;
+    centraleMontee = monterEcran(hote, sim, { enregistrer: rangerCentrale });
+    if (bouton) bouton.textContent = 'Replier le simulateur';
+    noter('info', 'simulateur de centrale ouvert',
+      { puissance: sim.plan()?.puissanceDc ?? null });
+  });
+}
+
+$('ouvrirCentrale')?.addEventListener('click', ouvrirSimulateurCentrale);

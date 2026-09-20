@@ -1,7 +1,7 @@
 # Tests
 
 ```
-npm test        # 361 tests, node:test, aucune dépendance
+npm test        # 481 tests, node:test, aucune dépendance
 ```
 
 ## Ce qui est couvert
